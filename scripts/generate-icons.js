@@ -1,0 +1,162 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import sharp from 'sharp';
+
+const publicDir = path.resolve('public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+
+// SVG content for standard icon with rich devotional Swami Samarth design
+const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF5722"/>
+      <stop offset="50%" stop-color="#E64A19"/>
+      <stop offset="100%" stop-color="#BF360C"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#FFF3E0" stop-opacity="0.9"/>
+      <stop offset="35%" stop-color="#FFE0B2" stop-opacity="0.6"/>
+      <stop offset="70%" stop-color="#FF9800" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#E64A19" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF9C4"/>
+      <stop offset="40%" stop-color="#FFD54F"/>
+      <stop offset="80%" stop-color="#FFB300"/>
+      <stop offset="100%" stop-color="#FFA000"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
+  
+  <!-- Aura / Sunlight rays -->
+  <circle cx="256" cy="220" r="210" fill="url(#sun)"/>
+
+  <!-- Ornate Decorative Ring -->
+  <circle cx="256" cy="220" r="176" fill="none" stroke="url(#gold)" stroke-width="5" stroke-dasharray="14 10" opacity="0.85"/>
+  <circle cx="256" cy="220" r="162" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.7"/>
+
+  <!-- Sacred Swami Paduka / Sun Rays Symbol -->
+  <g filter="url(#shadow)" transform="translate(256, 210)">
+    <!-- Sun Ray Petals around Center -->
+    <path d="M0 -150 L8 -120 L-8 -120 Z" fill="url(#gold)"/>
+    <path d="M106 -106 L80 -90 L90 -80 Z" fill="url(#gold)"/>
+    <path d="M150 0 L120 8 L120 -8 Z" fill="url(#gold)"/>
+    <path d="M106 106 L90 80 L80 90 Z" fill="url(#gold)"/>
+    <path d="M0 150 L-8 120 L8 120 Z" fill="url(#gold)"/>
+    <path d="M-106 106 L-80 90 L-90 80 Z" fill="url(#gold)"/>
+    <path d="M-150 0 L-120 -8 L-120 8 Z" fill="url(#gold)"/>
+    <path d="M-106 -106 L-90 -80 L-80 -90 Z" fill="url(#gold)"/>
+
+    <!-- Central Disc -->
+    <circle cx="0" cy="0" r="115" fill="#FFF8E1" stroke="url(#gold)" stroke-width="7"/>
+
+    <!-- Devotional Tilak (Chandrakor & Gandha) -->
+    <path d="M-38 -72 C-15 -90 15 -90 38 -72 C22 -80 -22 -80 -38 -72 Z" fill="#D32F2F"/>
+    <circle cx="0" cy="-62" r="7" fill="#C2185B"/>
+
+    <!-- Sacred 'श्री' Symbol in Devanagari calligraphy -->
+    <path d="M -28 -18 C -24 -36, -8 -45, 12 -42 C 28 -39, 36 -26, 32 -12 C 28 2, 12 8, -4 14 C -18 20, -28 32, -26 48 C -24 64, -8 72, 8 70 C 24 68, 36 56, 38 42 L 28 42 C 26 52, 18 60, 6 61 C -6 62, -16 56, -17 44 C -18 32, -9 24, 6 18 C 24 12, 42 2, 44 -16 C 46 -34, 34 -51, 12 -54 C -12 -57, -32 -46, -38 -20 Z" fill="#B71C1C"/>
+
+    <!-- Divine Padukas (Charan Paduka) -->
+    <!-- Left Paduka -->
+    <path d="M -48 10 C -48 0, -32 0, -32 10 L -30 42 C -30 52, -42 56, -46 56 C -50 56, -52 50, -52 42 Z" fill="url(#gold)" stroke="#B71C1C" stroke-width="2"/>
+    <circle cx="-40" cy="8" r="3.5" fill="#B71C1C"/>
+    
+    <!-- Right Paduka -->
+    <path d="M 32 10 C 32 0, 48 0, 48 10 L 52 42 C 52 50, 50 56, 46 56 C 42 56, 30 52, 30 42 Z" fill="url(#gold)" stroke="#B71C1C" stroke-width="2"/>
+    <circle cx="40" cy="8" r="3.5" fill="#B71C1C"/>
+  </g>
+
+  <!-- Banner / Plate for "श्री स्वामी समर्थ" & 2026 -->
+  <g filter="url(#shadow)">
+    <rect x="46" y="396" width="420" height="82" rx="41" fill="#FFFDE7" stroke="url(#gold)" stroke-width="4"/>
+    <text x="256" y="438" font-family="-apple-system, BlinkMacSystemFont, 'Mukta', 'Noto Sans Devanagari', 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="28" fill="#B71C1C" text-anchor="middle" letter-spacing="1">श्री स्वामी समर्थ</text>
+    <text x="256" y="466" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="20" fill="#E65100" text-anchor="middle" letter-spacing="3">कॅलेंडर २०२६</text>
+  </g>
+</svg>`;
+
+// Maskable version with 20% safe zone padding as required by PWA standards
+const maskableSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF5722"/>
+      <stop offset="50%" stop-color="#E64A19"/>
+      <stop offset="100%" stop-color="#BF360C"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFF3E0" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#FFE0B2" stop-opacity="0.6"/>
+      <stop offset="75%" stop-color="#FF9800" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#E64A19" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF9C4"/>
+      <stop offset="40%" stop-color="#FFD54F"/>
+      <stop offset="80%" stop-color="#FFB300"/>
+      <stop offset="100%" stop-color="#FFA000"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed background for maskable safe margin -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- Centered safe-zone scaled content (fits easily within 80% circle) -->
+  <g transform="translate(51, 51) scale(0.8)">
+    <circle cx="256" cy="220" r="200" fill="url(#sun)"/>
+    <circle cx="256" cy="220" r="165" fill="none" stroke="url(#gold)" stroke-width="6" stroke-dasharray="14 10"/>
+    <circle cx="256" cy="220" r="115" fill="#FFF8E1" stroke="url(#gold)" stroke-width="8"/>
+    
+    <!-- Central 'श्री' and Padukas -->
+    <path d="M 218 148 C 241 130 271 130 294 148 C 278 140 234 140 218 148 Z" fill="#D32F2F"/>
+    <circle cx="256" cy="158" r="7" fill="#C2185B"/>
+
+    <path d="M 228 202 C 232 184, 248 175, 268 178 C 284 181, 292 194, 288 208 C 284 222, 268 228, 252 234 C 238 240, 228 252, 230 268 C 232 284, 248 292, 264 290 C 280 288, 292 276, 294 262 L 284 262 C 282 272, 274 280, 262 281 C 250 282, 240 276, 239 264 C 238 252, 247 244, 262 238 C 280 232, 298 222, 300 204 C 302 186, 290 169, 268 166 C 244 163, 224 174, 218 200 Z" fill="#B71C1C"/>
+
+    <rect x="56" y="380" width="400" height="76" rx="38" fill="#FFFDE7" stroke="url(#gold)" stroke-width="4"/>
+    <text x="256" y="422" font-family="sans-serif" font-weight="900" font-size="28" fill="#B71C1C" text-anchor="middle">श्री स्वामी समर्थ २०२६</text>
+  </g>
+</svg>`;
+
+async function run() {
+  fs.writeFileSync(path.join(publicDir, 'icon.svg'), svgContent);
+  console.log('Written icon.svg');
+
+  await sharp(Buffer.from(svgContent))
+    .resize(192, 192)
+    .png()
+    .toFile(path.join(publicDir, 'pwa-192x192.png'));
+  console.log('Generated pwa-192x192.png');
+
+  await sharp(Buffer.from(svgContent))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(publicDir, 'pwa-512x512.png'));
+  console.log('Generated pwa-512x512.png');
+
+  await sharp(Buffer.from(maskableSvgContent))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(publicDir, 'pwa-maskable-512x512.png'));
+  console.log('Generated pwa-maskable-512x512.png');
+
+  await sharp(Buffer.from(svgContent))
+    .resize(180, 180)
+    .png()
+    .toFile(path.join(publicDir, 'apple-touch-icon.png'));
+  console.log('Generated apple-touch-icon.png');
+
+  await sharp(Buffer.from(svgContent))
+    .resize(64, 64)
+    .png()
+    .toFile(path.join(publicDir, 'favicon.ico'));
+  console.log('Generated favicon.ico');
+}
+
+run().catch(console.error);

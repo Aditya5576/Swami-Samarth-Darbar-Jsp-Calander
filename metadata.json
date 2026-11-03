@@ -1,0 +1,8 @@
+{
+  "name": "श्री स्वामी समर्थ सेवा दरबार, जयसिंगपूर | Swami Samarth Seva Darbar Calendar 2026",
+  "description": "श्री स्वामी समर्थ सेवा दरबार / सेवा केंद्र, जयसिंगपूर (कोल्हापूर) - दिनदर्शिका व पंचांग २०२६, नित्यसेवा, सण, मुहूर्त, एकादशी, संकष्टी व संपर्क माहिती.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
