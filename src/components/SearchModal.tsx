@@ -36,7 +36,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, currentYear = 
       <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-orange-100 flex flex-col max-h-[80vh] overflow-hidden">
         {/* Search Input Bar */}
         <div className="p-3.5 sm:p-4 border-b border-orange-100 flex items-center gap-2.5">
-          <Search className="w-5 h-5 text-orange-600 shrink-0" />
+          <img
+            src="/pwa-192x192.png"
+            alt="श्री स्वामी समर्थ"
+            className="w-7 h-7 rounded-lg object-cover ring-1 ring-orange-300 shrink-0 shadow-2xs"
+          />
+          <Search className="w-4 h-4 text-orange-600 shrink-0" />
           <input
             type="text"
             value={query}
@@ -70,7 +75,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, currentYear = 
                 <button
                   key={keyword}
                   onClick={() => setQuery(keyword)}
-                  className="px-2.5 py-1 rounded-full bg-white hover:bg-orange-100 border border-orange-200/80 text-xs text-orange-950 font-medium transition active:scale-95"
+                  className="px-2.5 py-1 rounded-full bg-white hover:bg-orange-100 border border-orange-200/80 text-xs text-orange-950 font-medium transition active:scale-95 whitespace-nowrap"
                 >
                   {keyword}
                 </button>

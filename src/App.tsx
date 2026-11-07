@@ -18,6 +18,7 @@ import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { DayData } from './types/calendar';
 import { getTodayDateInfo } from './utils/calendarLogic';
 import { initDailyNotificationScheduler } from './utils/notificationService';
+import { templeSound } from './utils/audioChime';
 import { ExternalLink, Sparkles, MapPin, Phone } from 'lucide-react';
 import { GURUPITH_INFO } from './data/calendar2026Data';
 
@@ -36,6 +37,7 @@ function AppContent() {
 
   // Initialize daily notification background checker (runs at 6:00 AM)
   useEffect(() => {
+    templeSound.preloadVoiceBuffer();
     const cleanup = initDailyNotificationScheduler(language);
     return () => cleanup();
   }, [language]);
@@ -92,25 +94,32 @@ function AppContent() {
             onClick={() => setSelectedDay(todayInfo.dayData)}
             className="mb-2.5 sm:mb-3.5 cursor-pointer rounded-2xl bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 p-2.5 sm:p-3 text-white shadow-md shadow-orange-950/10 flex items-center justify-between gap-2 transition active:scale-98"
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white font-black text-xs backdrop-blur-xs">
-                {todayInfo.dayData.isSwamiSpecial ? 'ॐ' : todayInfo.dayData.dayOfMonth}
-              </span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="relative shrink-0">
+                <img
+                  src="/pwa-192x192.png"
+                  alt="श्री स्वामी समर्थ"
+                  className="w-10 h-10 rounded-xl object-cover ring-2 ring-amber-300/80 shadow-xs"
+                />
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-black text-white border border-white">
+                  {todayInfo.dayData.isSwamiSpecial ? 'ॐ' : todayInfo.dayData.dayOfMonth}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-nowrap">
                   <span className="px-1.5 py-0.5 rounded-md bg-emerald-500 text-white text-[8px] font-black uppercase shrink-0">
                     {t('today')}
                   </span>
-                  <p className="text-[10px] text-amber-100 font-bold truncate">
+                  <p className="text-[10px] text-amber-100 font-bold whitespace-nowrap">
                     {todayInfo.dayData.marathiDayName} • {todayInfo.dayData.tithi}
                   </p>
                 </div>
-                <p className="text-xs sm:text-sm font-black text-white leading-tight mt-0.5 truncate">
+                <p className="text-xs sm:text-sm font-black text-white leading-tight mt-0.5 line-clamp-1">
                   {todayOccasionText}
                 </p>
               </div>
             </div>
-            <span className="shrink-0 px-2 py-1 rounded-xl bg-white text-orange-800 text-[11px] font-black shadow-xs">
+            <span className="shrink-0 px-2 py-1 rounded-xl bg-white text-orange-800 text-[11px] font-black shadow-xs whitespace-nowrap">
               {t('viewDetails')}
             </span>
           </div>
@@ -148,16 +157,16 @@ function AppContent() {
           <p className="text-xs font-bold text-orange-950/80 leading-relaxed max-w-md mx-auto px-2">
             {t('footerJaighosh')}
           </p>
-          <div className="flex items-center justify-center gap-2 text-[11px] text-amber-800 font-semibold flex-wrap">
-            <span>{language === 'mr' ? 'श्री स्वामी समर्थ सेवा दरबार / सेवा केंद्र, जयसिंगपूर' : 'Shree Swami Samarth Seva Darbar / Seva Kendra, Jaysingpur'}</span>
-            <span>•</span>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-[11px] text-amber-800 font-semibold text-center">
+            <span className="font-bold">{language === 'mr' ? 'श्री स्वामी समर्थ सेवा दरबार, जयसिंगपूर' : 'Shree Swami Samarth Seva Darbar, Jaysingpur'}</span>
+            <span className="hidden sm:inline">•</span>
             <a
               href={GURUPITH_INFO.mapShareUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-orange-700 hover:text-orange-900 underline inline-flex items-center gap-1 font-bold"
+              className="text-orange-700 hover:text-orange-900 underline inline-flex items-center gap-1 font-bold whitespace-nowrap"
             >
-              <MapPin className="w-3 h-3 text-red-600" />
+              <MapPin className="w-3 h-3 text-red-600 shrink-0" />
               <span>{language === 'mr' ? 'मंदिर स्थान (Google Maps)' : 'Temple Location'}</span>
             </a>
           </div>

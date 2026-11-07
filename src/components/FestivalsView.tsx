@@ -89,18 +89,27 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
           </div>
         </div>
 
-        <div>
-          <h2 className="text-base sm:text-lg font-black text-orange-950 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-orange-600 shrink-0" />
-            <span>
-              {language === 'en'
-                ? `Festivals & Panchang ${activeYear}`
-                : `सण, उत्सव, व्रत व पंचांग ${activeYear}`}
-            </span>
-          </h2>
-          <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
-            {t('festivalsSubtitle')}
-          </p>
+        <div className="flex items-center gap-2.5">
+          <div className="w-10 h-10 rounded-xl p-0.5 bg-gradient-to-tr from-amber-300 to-yellow-100 ring-2 ring-orange-400 shrink-0 shadow-2xs overflow-hidden">
+            <img
+              src="/pwa-192x192.png"
+              alt="श्री स्वामी समर्थ"
+              className="w-full h-full object-cover rounded-lg"
+            />
+          </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-black text-orange-950 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-orange-600 shrink-0" />
+              <span>
+                {language === 'en'
+                  ? `Festivals & Panchang ${activeYear}`
+                  : `सण, उत्सव, व्रत व पंचांग ${activeYear}`}
+              </span>
+            </h2>
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
+              {t('festivalsSubtitle')}
+            </p>
+          </div>
         </div>
 
         {/* Filter Pills - Smooth horizontal scrolling without occupying half the screen */}
@@ -158,21 +167,21 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
                 {/* Details Column */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] text-slate-500 font-medium">
+                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
                       {day.tithi} ({day.paksha} {t('paksha')}) • {day.nakshatra}
                     </span>
                     {day.isSwamiSpecial && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-orange-600 text-white text-[8px] font-black shrink-0">
+                      <span className="px-1.5 py-0.5 rounded-full bg-orange-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
                         {language === 'mr' ? 'स्वामी विशेष' : 'Swami Special'}
                       </span>
                     )}
                     {day.isEkadashi && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-black shrink-0">
+                      <span className="px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
                         {language === 'mr' ? 'एकादशी' : 'Ekadashi'}
                       </span>
                     )}
                     {day.isSankashti && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[8px] font-black shrink-0">
+                      <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
                         {language === 'mr' ? 'संकष्टी' : 'Sankashti'}
                       </span>
                     )}
@@ -187,7 +196,7 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
                             {language === 'en' ? f.titleEn : f.title}
                           </h3>
                           {f.description && (
-                            <p className="text-[11px] text-slate-600 line-clamp-1 leading-tight">
+                            <p className="text-[11px] text-slate-600 leading-snug mt-0.5">
                               {f.description}
                             </p>
                           )}
@@ -196,7 +205,7 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
                     </div>
                   ) : (
                     <div className="mt-1">
-                      <p className="text-xs font-semibold text-slate-700 line-clamp-1">
+                      <p className="text-xs font-semibold text-slate-700 leading-snug">
                         {day.swamiGuidance || (language === 'mr' ? 'नित्य स्वामी सेवा व नामजप' : 'Daily Swami Seva & Chanting')}
                       </p>
                     </div>

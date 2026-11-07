@@ -13,6 +13,9 @@ import {
   saveCustomTimerState,
   sendTimerAlertNotification,
   CustomTimerState,
+  scheduleFutureDailyAlarms,
+  testBackgroundNotification,
+  registerPeriodicDailySync,
 } from '../utils/notificationService';
 import {
   Bell,
@@ -30,6 +33,11 @@ import {
   Square,
   Flame,
   Zap,
+  Smartphone,
+  CalendarCheck,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface NotificationModalProps {
@@ -47,6 +55,9 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [testSent, setTestSent] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
+  const [bgTestCountdown, setBgTestCountdown] = useState<number | null>(null);
+  const [showBatteryHelp, setShowBatteryHelp] = useState(false);
 
   // Custom Timer States
   const [timerState, setTimerState] = useState<CustomTimerState | null>(getCustomTimerState());
@@ -117,6 +128,9 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
       setSettings(updated);
       saveNotificationSettings(updated);
       setErrorMessage(null);
+      // Auto register periodic sync and upcoming alarms
+      registerPeriodicDailySync();
+      scheduleFutureDailyAlarms(7, settings.time, language);
     } else {
       const updated = { ...settings, enabled: false };
       setSettings(updated);
@@ -129,12 +143,74 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     const updated = { ...settings, time };
     setSettings(updated);
     saveNotificationSettings(updated);
+    if (settings.enabled) {
+      scheduleFutureDailyAlarms(7, time, language);
+    }
   };
 
   const handleToggleSound = () => {
     const updated = { ...settings, soundEnabled: !settings.soundEnabled };
     setSettings(updated);
     saveNotificationSettings(updated);
+  };
+
+  const handleSchedule7DaysAlarms = async () => {
+    setErrorMessage(null);
+    setScheduleSuccessMsg(null);
+
+    if (isNotificationSupported() && Notification.permission !== 'granted') {
+      const res = await requestNotificationPermission();
+      setPermission(res);
+      if (res !== 'granted') {
+        setErrorMessage(
+          language === 'mr'
+            ? 'कृपया नोटिफिकेशन परवानगी द्या जेणेकरून अलार्म सेट करता येतील.'
+            : 'Please allow notification permission to schedule alarms.'
+        );
+        return;
+      }
+    }
+
+    await registerPeriodicDailySync();
+    await scheduleFutureDailyAlarms(7, settings.time, language);
+
+    setScheduleSuccessMsg(
+      language === 'mr'
+        ? `✅ पुढील ७ दिवसांचे दैनिक अलार्म (${settings.time}) यशस्वीरीत्या शेड्यूल झाले! अॅप बंद असतानाही हे दररोज वाजतील.`
+        : `✅ Next 7 days daily alarms (${settings.time}) scheduled! They will trigger even when the app is closed.`
+    );
+    setTimeout(() => setScheduleSuccessMsg(null), 6000);
+  };
+
+  const handleDelayedBgTest = async () => {
+    setErrorMessage(null);
+    setTestSent(false);
+
+    if (isNotificationSupported() && Notification.permission !== 'granted') {
+      const res = await requestNotificationPermission();
+      setPermission(res);
+      if (res !== 'granted') {
+        setErrorMessage(
+          language === 'mr'
+            ? 'कृपया नोटिफिकेशन परवानगी द्या.'
+            : 'Please allow notification permission.'
+        );
+        return;
+      }
+    }
+
+    testBackgroundNotification(5, language);
+    setBgTestCountdown(5);
+
+    const timer = setInterval(() => {
+      setBgTestCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleTestNotification = async () => {
@@ -267,12 +343,12 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
         {/* Modal Header */}
         <div className="relative bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 px-4 py-3.5 sm:px-5 sm:py-4 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-amber-200 shrink-0">
-              {modalTab === 'timer' ? (
-                <Timer className="w-5 h-5 text-white" />
-              ) : (
-                <Bell className="w-5 h-5 text-white" />
-              )}
+            <div className="w-10 h-10 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-300 to-yellow-100 ring-2 ring-white/60 shrink-0 shadow-sm overflow-hidden">
+              <img
+                src="/pwa-192x192.png"
+                alt="श्री स्वामी समर्थ"
+                className="w-full h-full object-cover rounded-xl"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -353,6 +429,37 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                       settings.enabled ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
+                </button>
+              </div>
+
+              {/* Background Status & Closed App Feature Banner */}
+              <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300/80 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-orange-600 shrink-0" />
+                  <span className="text-xs font-black text-amber-950">
+                    {language === 'mr'
+                      ? '📱 बॅकग्राउंड मोड: अॅप बंद असतानाही सूचना'
+                      : '📱 Background Mode: Alerts when app is closed'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed">
+                  {language === 'mr'
+                    ? 'सेवा केंद्र PWA सिस्टीम अलार्म व Periodic Background Sync द्वारे अॅप पूर्णपणे बंद (Force Close) असतानाही सकाळी सूचना पाठवते.'
+                    : 'Works even when the app is completely closed via OS alarms and periodic background sync.'}
+                </p>
+
+                {/* 1-Tap Schedule 7 Days Alarms Button */}
+                <button
+                  type="button"
+                  onClick={handleSchedule7DaysAlarms}
+                  className="w-full py-2 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-98"
+                >
+                  <CalendarCheck className="w-3.5 h-3.5" />
+                  <span>
+                    {language === 'mr'
+                      ? 'पुढील ७ दिवसांचे दैनिक अलार्म शेड्यूल करा'
+                      : 'Schedule Next 7 Days Daily Alarms'}
+                  </span>
                 </button>
               </div>
 
@@ -456,14 +563,94 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 </div>
               </div>
 
-              {/* Action Button: Test Notification Now */}
-              <button
-                onClick={handleTestNotification}
-                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 active:scale-98 text-white font-black text-sm shadow-md shadow-orange-900/10 flex items-center justify-center gap-2 transition"
-              >
-                <Send className="w-4 h-4" />
-                <span>{t('dailyNotifTestBtn')}</span>
-              </button>
+              {/* Action Buttons: Instant Test + 5s Background Test (Close App) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleTestNotification}
+                  className="py-2.5 px-3 rounded-2xl bg-white border border-orange-300 text-orange-900 font-bold text-xs hover:bg-orange-50 active:scale-98 flex items-center justify-center gap-1.5 transition shadow-2xs"
+                >
+                  <Send className="w-3.5 h-3.5 text-orange-600" />
+                  <span>{t('dailyNotifTestBtn')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDelayedBgTest}
+                  disabled={bgTestCountdown !== null}
+                  className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 active:scale-98 text-white font-black text-xs flex items-center justify-center gap-1.5 transition shadow-xs disabled:opacity-75"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  <span>
+                    {bgTestCountdown !== null
+                      ? language === 'mr'
+                        ? `अॅप बंद करा (${bgTestCountdown}s)...`
+                        : `Close App (${bgTestCountdown}s)...`
+                      : language === 'mr'
+                      ? '५ सेकंदात बॅकग्राउंड चाचणी (अॅप बंद करा)'
+                      : '5s Background Test (Close App)'}
+                  </span>
+                </button>
+              </div>
+
+              {bgTestCountdown !== null && (
+                <div className="p-3 rounded-2xl bg-amber-100 border border-amber-300 text-amber-950 text-xs font-bold text-center animate-pulse">
+                  🔔{' '}
+                  {language === 'mr'
+                    ? 'कृपया आता होम स्क्रीनवर जा किंवा फोन लॉक करा! ५ सेकंदात नोटिफिकेशन येईल.'
+                    : 'Please go to home screen or lock your phone now! Notification will pop up in 5s.'}
+                </div>
+              )}
+
+              {/* Collapsible Android Battery Optimization Tips */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowBatteryHelp(!showBatteryHelp)}
+                  className="w-full p-2.5 text-left text-xs font-bold text-slate-800 flex items-center justify-between hover:bg-slate-100/70"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-amber-600" />
+                    <span>
+                      {language === 'mr'
+                        ? 'अॅप बंद असताना सूचना न आल्यास काय करावे?'
+                        : 'Troubleshooting closed-app notifications'}
+                    </span>
+                  </span>
+                  {showBatteryHelp ? (
+                    <ChevronUp className="w-4 h-4 text-slate-500" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-500" />
+                  )}
+                </button>
+
+                {showBatteryHelp && (
+                  <div className="p-3 pt-0 text-[11px] text-slate-600 space-y-1.5 border-t border-slate-200/60 mt-1 leading-relaxed">
+                    <p className="font-semibold text-slate-800">
+                      {language === 'mr'
+                        ? 'Android डिव्हाइसवर बॅकग्राउंड नोटिफिकेशन सुरळीत चालण्यासाठी:'
+                        : 'To ensure seamless background notifications on Android:'}
+                    </p>
+                    <ol className="list-decimal pl-4 space-y-1">
+                      <li>
+                        {language === 'mr'
+                          ? 'अॅप "Install" (मोबाईल होम स्क्रीनवर स्थापित) करा.'
+                          : 'Install the app on your mobile home screen (PWA).'}
+                      </li>
+                      <li>
+                        {language === 'mr'
+                          ? 'मोबाईल Settings -> Apps -> "स्वामी समर्थ" -> Battery मध्ये जाऊन "Unrestricted" (अमर्यादित) निवडा.'
+                          : 'In phone Settings -> Apps -> App Info -> Battery, set to "Unrestricted" so Android does not kill background alarms.'}
+                      </li>
+                      <li>
+                        {language === 'mr'
+                          ? 'रील वरील "पुढील ७ दिवसांचे दैनिक अलार्म शेड्यूल करा" बटण दाबा.'
+                          : 'Tap "Schedule Next 7 Days Daily Alarms" button above.'}
+                      </li>
+                    </ol>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             /* TAB 2: CUSTOM NOTIFICATION TIMER OPTION */
@@ -473,7 +660,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="p-1.5 rounded-xl bg-white/20 backdrop-blur-xs">
-                        <Timer className="w-5 h-5 text-amber-200 animate-spin" style={{ animationDuration: '4s' }} />
+                        <Timer
+                          className="w-5 h-5 text-amber-200 animate-spin"
+                          style={{ animationDuration: '4s' }}
+                        />
                       </span>
                       <div>
                         <span className="text-[10px] uppercase tracking-wider text-emerald-100 font-black block">
@@ -518,7 +708,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                     </label>
 
                     <div className="grid grid-cols-6 gap-1">
-                      {[1, 5, 10, 15, 30, 60].map(mins => (
+                      {[5, 10, 15, 20, 30, 45].map((mins) => (
                         <button
                           key={mins}
                           type="button"
@@ -526,29 +716,28 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                             setSelectedMinutes(mins);
                             setCustomInputMinutes('');
                           }}
-                          className={`py-1.5 rounded-xl text-[11px] font-bold border transition text-center ${
+                          className={`py-2 rounded-xl text-xs font-bold border transition ${
                             selectedMinutes === mins && !customInputMinutes
                               ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
                               : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
                           }`}
                         >
-                          {mins} {t('minutes')}
+                          {mins}m
                         </button>
                       ))}
                     </div>
 
-                    {/* Custom Minutes Input */}
-                    <div className="pt-2 flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-slate-600 shrink-0">
+                    <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-200">
+                      <span className="text-[11px] font-bold text-slate-600">
                         {t('customMinutes')}:
                       </span>
                       <input
                         type="number"
                         min="1"
                         max="360"
-                        placeholder="उदा. 45"
+                        placeholder="उदा. 25"
                         value={customInputMinutes}
-                        onChange={e => {
+                        onChange={(e) => {
                           setCustomInputMinutes(e.target.value);
                           if (e.target.value) {
                             setSelectedMinutes(parseInt(e.target.value, 10) || 15);
@@ -573,7 +762,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                         { key: 'aarti', label: t('purposeAarti') },
                         { key: 'moonrise', label: t('purposeMoonrise') },
                         { key: 'general', label: t('purposeGeneral') },
-                      ].map(item => (
+                      ].map((item) => (
                         <button
                           key={item.key}
                           type="button"
@@ -606,7 +795,9 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                       className="w-full py-3 px-3 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-black text-xs sm:text-sm shadow-md shadow-amber-900/10 flex items-center justify-center gap-1.5 transition"
                     >
                       <Zap className="w-4 h-4 fill-current" />
-                      <span>{language === 'mr' ? '१० सेकंद जलद चाचणी' : '10s Quick Test'}</span>
+                      <span>
+                        {language === 'mr' ? '१० सेकंद जलद चाचणी' : '10s Quick Test'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -615,6 +806,13 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           )}
 
           {/* Feedback & Error states */}
+          {scheduleSuccessMsg && (
+            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-center gap-2 text-xs font-bold animate-in fade-in">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{scheduleSuccessMsg}</span>
+            </div>
+          )}
+
           {timerSuccessMsg && (
             <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center gap-2 text-xs font-bold animate-in fade-in">
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />

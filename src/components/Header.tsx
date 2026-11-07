@@ -33,13 +33,13 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-xl sm:max-w-4xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2">
         {/* Brand & Temple Identity - Generous width, NEVER truncates! */}
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-          {/* Temple Emblem Medallion */}
+          {/* Temple Emblem Medallion with Jaysingpur Murti */}
           <div className="relative shrink-0">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 p-0.5 shadow-sm ring-1 ring-amber-300/60 flex items-center justify-center">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 p-0.5 shadow-sm ring-1 ring-amber-300/80 flex items-center justify-center overflow-hidden">
               <img
-                src="/icon.svg"
-                alt="Shree Swami Samarth Seva Kendra Jaysingpur"
-                className="w-full h-full object-contain rounded-xl bg-orange-700"
+                src="/pwa-192x192.png"
+                alt="श्री स्वामी समर्थ सेवा केंद्र जयसिंगपूर"
+                className="w-full h-full object-cover rounded-lg"
               />
             </div>
             <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-600 text-[8px] font-black text-amber-100 border border-amber-200">
@@ -47,22 +47,17 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
 
-          {/* Title & Location Header (Optimized for both mobile and desktop to prevent truncation) */}
+          {/* Title & Location Header - Clean, prominent, no awkward wrapping */}
           <div className="min-w-0 flex-1">
-            <h1 className="text-xs sm:text-base font-black tracking-tight text-white leading-tight">
-              <span className="block sm:inline truncate">
-                {language === 'mr' ? 'श्री स्वामी समर्थ सेवा दरबार' : 'Shree Swami Samarth Seva Darbar'}
-              </span>
-              <span className="hidden sm:inline">
-                {language === 'mr' ? ' / सेवा केंद्र' : ' / Seva Kendra'}
-              </span>
+            <h1 className="text-xs sm:text-base font-black tracking-tight text-white leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
+              {language === 'mr' ? 'श्री स्वामी समर्थ सेवा दरबार, जयसिंगपूर' : 'Shree Swami Samarth Seva Darbar, Jaysingpur'}
             </h1>
             <a
               href="https://share.google/f18TuAysrg8IiGt7x"
               target="_blank"
               rel="noopener noreferrer"
               title={language === 'mr' ? 'गूगल नकाशावर मंदिर स्थान पहा' : 'View Temple Location on Map'}
-              className="text-[10px] sm:text-xs text-amber-200 font-semibold leading-tight mt-0.5 inline-flex items-center gap-1 hover:text-white transition flex-wrap"
+              className="text-[10px] sm:text-xs text-amber-200 font-semibold leading-tight mt-0.5 inline-flex items-center gap-1 hover:text-white transition whitespace-nowrap overflow-hidden"
             >
               <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-300 shrink-0" />
               <span className="underline decoration-amber-300/50 underline-offset-2">

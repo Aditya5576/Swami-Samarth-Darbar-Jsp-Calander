@@ -8,6 +8,7 @@ export interface NotificationSettings {
   time: string; // '06:00', '05:30', '07:00', '08:00'
   soundEnabled: boolean;
   lastNotifiedDate?: string; // 'YYYY-MM-DD'
+  backgroundSyncEnabled?: boolean;
 }
 
 const SETTINGS_KEY = 'swami_daily_notif_settings';
@@ -17,6 +18,7 @@ export const DEFAULT_NOTIF_SETTINGS: NotificationSettings = {
   time: '06:00',
   soundEnabled: true,
   lastNotifiedDate: undefined,
+  backgroundSyncEnabled: true,
 };
 
 export function getNotificationSettings(): NotificationSettings {
@@ -92,7 +94,7 @@ export function buildTodayNotificationMessage(day: DayData, lang: 'mr' | 'en' = 
 
     if (isSankashti) {
       const moon = day.moonriseTime ? ` (Moonrise: ${day.moonriseTime})` : '';
-      title = "🔴 Today is Sankashti Chaturthi!";
+      title = '🔴 Today is Sankashti Chaturthi!';
       body = `Auspicious Sankashti fasting today${moon}. Recite Sankatnashan Ganesh Stotra and chant Shree Swami Samarth.`;
     } else if (isSwamiSpecial) {
       const festTitle = hasFestivals ? day.festivals[0].titleEn : 'Swami Special Day';
@@ -143,6 +145,12 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   if (!isNotificationSupported()) return 'denied';
   try {
     const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      // Auto-register background sync and alarms
+      registerPeriodicDailySync();
+      const settings = getNotificationSettings();
+      scheduleFutureDailyAlarms(7, settings.time, 'mr');
+    }
     return permission;
   } catch (e) {
     console.error('Error requesting notification permission:', e);
@@ -187,6 +195,7 @@ export async function sendDailyNotification(
           icon: badgeIcon,
           badge: badgeIcon,
           tag: 'swami-daily-alert',
+          renotify: true,
           data: {
             url: '/',
             date: targetDay.date,
@@ -216,11 +225,147 @@ export async function sendDailyNotification(
 }
 
 /**
- * Initializes the background timer that checks every 60 seconds if it is time to trigger the daily morning alert.
- * 100% Free of Cost - runs purely inside the client device!
+ * Registers Periodic Background Sync so the Android OS wakes up the Service Worker
+ * even when the PWA is closed!
+ */
+export async function registerPeriodicDailySync(): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    if ('periodicSync' in registration) {
+      const periodicSync = (registration as any).periodicSync;
+      try {
+        await periodicSync.register('daily-darshan-sync', {
+          minInterval: 12 * 60 * 60 * 1000, // 12 hours interval for morning notification
+        });
+        return true;
+      } catch (err) {
+        console.warn('Periodic sync register fallback:', err);
+      }
+    }
+  } catch (e) {
+    console.warn('Periodic sync registration error:', e);
+  }
+  return false;
+}
+
+/**
+ * Schedules future daily morning alarms (using Notification Triggers API / TimestampTrigger)
+ * so Android triggers the notifications at the specified time even if the app is closed!
+ */
+export async function scheduleFutureDailyAlarms(
+  daysAhead = 7,
+  time = '06:00',
+  lang: 'mr' | 'en' = 'mr'
+): Promise<number> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return 0;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const [hours, minutes] = time.split(':').map(Number);
+    let count = 0;
+
+    const now = new Date();
+    for (let i = 1; i <= daysAhead; i++) {
+      const targetDate = new Date();
+      targetDate.setDate(now.getDate() + i);
+      targetDate.setHours(hours, minutes, 0, 0);
+
+      const dateStr = targetDate.toISOString().split('T')[0];
+      const title =
+        lang === 'mr'
+          ? '॥ श्री स्वामी समर्थ ॥ शुभ प्रभात'
+          : '॥ Shree Swami Samarth ॥ Good Morning';
+      const body =
+        lang === 'mr'
+          ? 'आजचे पंचांग व नित्यसेवा स्मरण. "भिऊ नकोस मी तुझ्या पाठीशी आहे."'
+          : "Today's Panchang & Nitya Seva. \"Fear not, I am with you.\"";
+
+      // Check if browser supports TimestampTrigger
+      const TimestampTriggerClass = (window as any).TimestampTrigger;
+      if ('showTrigger' in Notification.prototype && TimestampTriggerClass) {
+        try {
+          await registration.showNotification(title, {
+            body,
+            icon: '/pwa-192x192.png',
+            badge: '/pwa-192x192.png',
+            tag: `swami-alarm-${dateStr}`,
+            showTrigger: new TimestampTriggerClass(targetDate.getTime()),
+            data: { url: '/', date: dateStr },
+          } as any);
+          count++;
+        } catch (e) {
+          console.warn('TimestampTrigger register failed for date:', dateStr, e);
+        }
+      }
+
+      // Notify service worker of schedule
+      if (registration.active) {
+        registration.active.postMessage({
+          type: 'SCHEDULE_DAY_ALARM',
+          title,
+          body,
+          timestamp: targetDate.getTime(),
+          tag: `swami-alarm-${dateStr}`,
+        });
+      }
+    }
+
+    return count;
+  } catch (err) {
+    console.warn('Failed scheduling future daily alarms:', err);
+    return 0;
+  }
+}
+
+/**
+ * Sends a delayed background test notification through the Service Worker
+ * so the user can close the app and verify the notification pops up!
+ */
+export async function testBackgroundNotification(
+  delaySeconds = 5,
+  lang: 'mr' | 'en' = 'mr'
+): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const title =
+      lang === 'mr'
+        ? '॥ श्री स्वामी समर्थ ॥ चाचणी सूचना'
+        : '॥ Shree Swami Samarth ॥ Test Alert';
+    const body =
+      lang === 'mr'
+        ? 'अॅप बंद असतानाही ही सूचना यशस्वीरीत्या आली! "भिऊ नकोस मी तुझ्या पाठीशी आहे."'
+        : 'Notification received successfully even with app closed! "Fear not, I am with you."';
+
+    if (registration.active) {
+      registration.active.postMessage({
+        type: 'TEST_BACKGROUND_NOTIFICATION',
+        delayMs: delaySeconds * 1000,
+        title,
+        body,
+      });
+      return true;
+    }
+  } catch (e) {
+    console.warn('Test background notification failed:', e);
+  }
+  return false;
+}
+
+/**
+ * Initializes the background scheduler and registers periodic sync and upcoming alarms.
  */
 export function initDailyNotificationScheduler(lang: 'mr' | 'en' = 'mr'): () => void {
   if (typeof window === 'undefined') return () => {};
+
+  // Setup periodic sync and future alarms on startup
+  if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+    registerPeriodicDailySync();
+    const settings = getNotificationSettings();
+    if (settings.enabled) {
+      scheduleFutureDailyAlarms(7, settings.time, lang);
+    }
+  }
 
   const checkAndTrigger = () => {
     const settings = getNotificationSettings();
@@ -228,11 +373,6 @@ export function initDailyNotificationScheduler(lang: 'mr' | 'en' = 'mr'): () => 
     if (Notification.permission !== 'granted') return;
 
     const now = new Date();
-    const currentHours = String(now.getHours()).padStart(2, '0');
-    const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-    const currentTimeStr = `${currentHours}:${currentMinutes}`;
-
-    // Target time comparison (e.g. '06:00')
     const [targetHour, targetMinute] = settings.time.split(':').map(Number);
     const isPastTargetTime =
       now.getHours() > targetHour ||
@@ -253,7 +393,7 @@ export function initDailyNotificationScheduler(lang: 'mr' | 'en' = 'mr'): () => 
   // Run initial check
   checkAndTrigger();
 
-  // Check every 60 seconds
+  // Check every 60 seconds while open
   const intervalId = window.setInterval(checkAndTrigger, 60000);
 
   return () => {
@@ -346,4 +486,3 @@ export async function sendTimerAlertNotification(
     }
   }
 }
-

@@ -19,7 +19,7 @@ export const NityaSevaView: React.FC = () => {
   // Japa Mala State
   const [japaCount, setJapaCount] = useState(0);
   const [totalMalas, setTotalMalas] = useState(0);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [chantVoiceMode, setChantVoiceMode] = useState<'voice' | 'bell' | 'mute'>('voice');
   const [showCelebration, setShowCelebration] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
@@ -33,11 +33,13 @@ export const NityaSevaView: React.FC = () => {
     if (savedCount) {
       setJapaCount(parseInt(savedCount, 10) || 0);
     }
+    // Eagerly pre-decode chant audio buffer for instant zero-latency tapping
+    templeSound.preloadVoiceBuffer();
   }, []);
 
   const handleBeadClick = () => {
-    if (soundEnabled) {
-      templeSound.playBell(720 + (japaCount % 8) * 20, 0.4);
+    if (chantVoiceMode !== 'mute') {
+      templeSound.playSwamiChant(chantVoiceMode);
     }
 
     const nextCount = japaCount + 1;
@@ -48,7 +50,7 @@ export const NityaSevaView: React.FC = () => {
       setTotalMalas(newTotal);
       localStorage.setItem('swami_total_malas', String(newTotal));
       setShowCelebration(true);
-      if (soundEnabled) {
+      if (chantVoiceMode !== 'mute') {
         templeSound.playCompletionChime();
       }
       setTimeout(() => setShowCelebration(false), 4500);
@@ -75,7 +77,7 @@ export const NityaSevaView: React.FC = () => {
         ? 'Japa count and all malas reset to 0!'
         : 'Japa count reset to 0!'
     );
-    if (soundEnabled) {
+    if (chantVoiceMode !== 'mute') {
       templeSound.playBell(520, 0.3);
     }
     setTimeout(() => setResetFeedback(null), 3000);
@@ -119,17 +121,34 @@ export const NityaSevaView: React.FC = () => {
       {/* Main Tab Content */}
       {activeTab === 'japa' ? (
         <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 shadow-xs border border-orange-100 text-center space-y-4 sm:space-y-5">
-          {/* Header */}
-          <div className="space-y-1">
-            <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-900 text-[11px] font-bold border border-orange-200">
-              {t('japaSubtitle')}
-            </span>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1.5">
-              ॥ श्री स्वामी समर्थ ॥
-            </h2>
-            <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-              {t('japaInstruction')}
-            </p>
+          {/* Header with Sacred Swami Samarth Darshan Medallion */}
+          <div className="space-y-2">
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full p-1 bg-gradient-to-tr from-amber-300 via-orange-500 to-amber-200 shadow-md ring-2 ring-orange-400 overflow-hidden">
+                  <img
+                    src="/pwa-192x192.png"
+                    alt="श्री स्वामी समर्थ"
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                </div>
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[8px] font-black uppercase whitespace-nowrap border border-amber-200 shadow-2xs">
+                  जयसिंगपूर
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-900 text-[11px] font-bold border border-orange-200">
+                {t('japaSubtitle')}
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+                ॥ श्री स्वामी समर्थ ॥
+              </h2>
+              <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+                {t('japaInstruction')}
+              </p>
+            </div>
           </div>
 
           {/* Celebration Banner */}
@@ -231,37 +250,66 @@ export const NityaSevaView: React.FC = () => {
             </div>
           </div>
 
-          {/* Mala Stats & Interactive Controls */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+          {/* Mala Stats & Interactive Controls - Clean non-wrapping row */}
+          <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
             {/* Completed Malas Counter */}
-            <div className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl bg-amber-50 border border-amber-200 text-xs sm:text-sm font-bold text-amber-950">
+            <div className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl bg-amber-50 border border-amber-200 text-xs sm:text-sm font-bold text-amber-950 whitespace-nowrap shrink-0">
               {t('completedMalas')} <strong className="text-orange-700 text-sm sm:text-base ml-1">{totalMalas}</strong>
             </div>
 
-            {/* Sound Toggle */}
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              aria-label={soundEnabled ? t('bellSoundOff') : t('bellSoundOn')}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 active:scale-95 transition"
-            >
-              {soundEnabled ? (
-                <>
-                  <Volume2 className="w-4 h-4 text-orange-600" />
-                  <span>{t('bellSoundOn')}</span>
-                </>
-              ) : (
-                <>
-                  <VolumeX className="w-4 h-4 text-slate-400" />
-                  <span>{t('bellSoundOff')}</span>
-                </>
-              )}
-            </button>
+            {/* Chant Voice Style Selector: Sweet Voice | Temple Bell | Mute */}
+            <div className="flex items-center gap-1 bg-amber-50/90 p-1 rounded-xl sm:rounded-2xl border border-amber-200 text-xs shrink-0">
+              <button
+                onClick={() => {
+                  setChantVoiceMode('voice');
+                  templeSound.playSwamiChant('voice');
+                }}
+                className={`px-3 py-1.5 rounded-lg sm:rounded-xl font-bold transition-all text-xs whitespace-nowrap ${
+                  chantVoiceMode === 'voice'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-amber-950 hover:bg-amber-100/70'
+                }`}
+                title={language === 'mr' ? 'मधुर नामजप स्वर (ऐकण्यासाठी टॅप करा)' : 'Sweet Chant Voice (Tap to hear sample)'}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-inherit" />
+                  <span>{language === 'mr' ? 'मधुर नामजप स्वर' : 'Sweet Voice'}</span>
+                </span>
+              </button>
 
-            {/* Reset Button (Opens inline confirm dialog - NO window.confirm!) */}
+              <button
+                onClick={() => {
+                  setChantVoiceMode('bell');
+                  templeSound.playSwamiChant('bell');
+                }}
+                className={`px-3 py-1.5 rounded-lg sm:rounded-xl font-bold transition-all text-xs whitespace-nowrap ${
+                  chantVoiceMode === 'bell'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-amber-950 hover:bg-amber-100/70'
+                }`}
+                title={language === 'mr' ? 'मंद घंटानाद' : 'Temple Bell'}
+              >
+                <span>{language === 'mr' ? 'घंटानाद' : 'Temple Bell'}</span>
+              </button>
+
+              <button
+                onClick={() => setChantVoiceMode('mute')}
+                className={`p-1.5 rounded-lg sm:rounded-xl font-bold transition-all text-xs ${
+                  chantVoiceMode === 'mute'
+                    ? 'bg-slate-700 text-white shadow-xs'
+                    : 'text-slate-500 hover:bg-slate-200/70'
+                }`}
+                title={language === 'mr' ? 'आवाज म्यूट (केवळ व्हायब्रेशन)' : 'Mute Sound'}
+              >
+                <VolumeX className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Reset Button */}
             <button
               onClick={() => setShowResetConfirm(true)}
               aria-label={t('reset')}
-              className="flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border border-red-200 hover:bg-red-50 text-xs font-bold text-red-700 active:scale-95 transition"
+              className="flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border border-red-200 hover:bg-red-50 text-xs font-bold text-red-700 active:scale-95 transition whitespace-nowrap shrink-0"
             >
               <RotateCcw className="w-3.5 h-3.5 text-red-600" />
               <span>{t('reset')}</span>

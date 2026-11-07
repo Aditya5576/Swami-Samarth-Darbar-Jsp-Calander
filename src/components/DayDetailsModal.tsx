@@ -79,18 +79,27 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
             : 'bg-gradient-to-r from-orange-600 to-amber-600'
         }`}>
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold tracking-wide backdrop-blur-xs">
-                  {getDayName(day.dayOfWeek)}
-                </span>
-                <span className="text-amber-100 text-xs font-medium">
-                  {day.marathiMonth} | {day.shakeYear}
-                </span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl p-0.5 bg-gradient-to-tr from-amber-300 via-yellow-200 to-amber-400 ring-2 ring-white/60 shrink-0 shadow-sm overflow-hidden">
+                <img
+                  src="/pwa-192x192.png"
+                  alt="श्री स्वामी समर्थ"
+                  className="w-full h-full object-cover rounded-lg"
+                />
               </div>
-              <h2 id="day-details-title" className="text-xl sm:text-2xl font-black mt-1 text-white tracking-tight">
-                {formatDate(day.date)}
-              </h2>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] sm:text-xs font-bold tracking-wide backdrop-blur-xs">
+                    {getDayName(day.dayOfWeek)}
+                  </span>
+                  <span className="text-amber-100 text-[10px] sm:text-xs font-medium">
+                    {day.marathiMonth} | {day.shakeYear}
+                  </span>
+                </div>
+                <h2 id="day-details-title" className="text-lg sm:text-2xl font-black mt-0.5 text-white tracking-tight">
+                  {formatDate(day.date)}
+                </h2>
+              </div>
             </div>
 
             <div className="flex items-center gap-1.5">

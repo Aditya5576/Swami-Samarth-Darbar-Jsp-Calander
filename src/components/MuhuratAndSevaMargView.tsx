@@ -23,12 +23,15 @@ import {
   Stethoscope,
   Leaf,
   ShieldAlert,
+  X,
+  ZoomIn,
 } from 'lucide-react';
 
 export const MuhuratAndSevaMargView: React.FC = () => {
   const { language, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'gurupith' | 'muhurat' | 'departments'>('gurupith');
   const [addressCopied, setAddressCopied] = useState(false);
+  const [showFullDarshan, setShowFullDarshan] = useState(false);
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(
@@ -80,10 +83,62 @@ export const MuhuratAndSevaMargView: React.FC = () => {
       {activeTab === 'gurupith' && (
         <div className="space-y-3.5">
           {/* Main Feature: Jaysingpur Seva Darbar Card */}
-          <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-amber-50 via-white to-orange-50 p-4 sm:p-5 shadow-xs border border-orange-200 space-y-3.5">
-            <div className="flex items-start gap-3">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-orange-600 flex items-center justify-center p-2 text-white shrink-0 shadow-sm shadow-orange-900/20">
-                <span className="text-xl font-black">ॐ</span>
+          <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-amber-50 via-white to-orange-50 p-4 sm:p-5 shadow-xs border border-orange-200 space-y-4">
+            {/* Direct Murti Darshan Showcase - Dignified Portrait Framing */}
+            <div className="space-y-3">
+              {/* Header Label */}
+              <div className="flex items-center justify-between pb-1.5 border-b border-orange-200/70">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-orange-600" />
+                  <span className="font-black text-xs sm:text-sm text-orange-950 uppercase tracking-wide">
+                    {language === 'mr' ? 'प्रत्यक्ष मूर्ती दर्शन' : 'Direct Murti Darshan'}
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-900 text-[10px] font-black border border-orange-300">
+                  {language === 'mr' ? 'जयसिंगपूर दरबार' : 'Jaysingpur Darbar'}
+                </span>
+              </div>
+
+              {/* Authentic Jaysingpur Murti Portrait Frame */}
+              <div
+                onClick={() => setShowFullDarshan(true)}
+                className="group relative rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-amber-300 shadow-md bg-stone-950 cursor-pointer max-w-xs sm:max-w-sm mx-auto aspect-[3/4] flex items-center justify-center transition-all hover:border-amber-400 active:scale-[0.99]"
+                title={language === 'mr' ? 'पूर्ण दर्शन घेण्यासाठी टॅप करा' : 'Click to view full darshan'}
+              >
+                <img
+                  src="/assets/aistudio/img_2912_1024_edcd846d.jpg"
+                  alt="श्री स्वामी समर्थ प्रत्यक्ष मूर्ती दर्शन, जयसिंगपूर दरबार"
+                  className="w-full h-full object-cover object-[center_30%] group-hover:scale-105 transition-transform duration-500"
+                />
+
+                {/* Subtle bottom chant ribbon - Completely non-obstructive */}
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 pt-6 text-center">
+                  <p className="text-amber-200 font-black text-xs sm:text-sm tracking-wider drop-shadow">
+                    ॥ श्री स्वामी समर्थ ॥
+                  </p>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-100/95 font-semibold mt-0.5 underline decoration-amber-400/80">
+                    <ZoomIn className="w-3 h-3 text-amber-300" />
+                    <span>{language === 'mr' ? 'पूर्ण दर्शन घेण्यासाठी टॅप करा' : 'Tap for full screen darshan'}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Devotional Mahamantra Ribbon */}
+              <div className="text-center py-2 px-3 rounded-xl bg-amber-100/70 border border-amber-200">
+                <p className="text-xs sm:text-sm font-extrabold text-orange-950 tracking-tight leading-snug">
+                  ॥ अनंतकोटी ब्रह्मांडनायक राजाधिराज योगीराज सद्गुरु श्री स्वामी समर्थ महाराज की जय ॥
+                </p>
+              </div>
+            </div>
+
+            {/* Official Center Identity */}
+            <div className="flex items-start gap-3 pt-1">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl p-0.5 bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 ring-2 ring-amber-400 shrink-0 shadow-sm overflow-hidden">
+                <img
+                  src="/pwa-192x192.png"
+                  alt="श्री स्वामी समर्थ"
+                  className="w-full h-full object-cover rounded-xl"
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <span className="px-2 py-0.5 rounded-full bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider">
@@ -119,41 +174,63 @@ export const MuhuratAndSevaMargView: React.FC = () => {
               {/* Contacts */}
               <div className="pt-1.5 border-t border-slate-100 space-y-1.5">
                 <div className="flex items-start gap-2">
-                  <Phone className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-                  <div className="flex-1 space-y-1">
-                    <p className="font-bold text-slate-900">{language === 'mr' ? 'संपर्क अधिकारी:' : 'Contacts:'}</p>
-                    <div className="flex flex-col sm:flex-row gap-2">
+                  <Phone className="w-4 h-4 text-orange-600 shrink-0 mt-1" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <p className="font-bold text-slate-900 text-xs">{language === 'mr' ? 'संपर्क अधिकारी:' : 'Contacts:'}</p>
+                    <div className="space-y-2 w-full">
                       <a
                         href="tel:+919960401550"
-                        className="inline-flex items-center gap-1.5 flex-wrap text-orange-800 hover:text-orange-950 font-bold bg-orange-50 px-2.5 py-1.5 rounded-lg border border-orange-200"
+                        className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-orange-50/90 hover:bg-orange-100/90 border border-orange-200 transition group w-full"
                       >
-                        <span>+91 99604 01550</span>
-                        <span className="text-[10px] text-slate-600 font-normal">
-                          ({language === 'mr' ? 'श्री गोवर्धन डबाडे / अण्णा' : 'Shri Govardhan Dabade / Anna'})
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-semibold text-slate-700 truncate">
+                            {language === 'mr' ? 'श्री गोवर्धन डबाडे (अण्णा)' : 'Shri Govardhan Dabade (Anna)'}
+                          </p>
+                          <span className="text-xs sm:text-sm font-black text-orange-950 font-mono tracking-wide block mt-0.5">
+                            +91 99604 01550
+                          </span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 text-white font-bold text-[11px] shrink-0 shadow-2xs group-hover:bg-orange-700 transition">
+                          <Phone className="w-3 h-3" />
+                          <span>{language === 'mr' ? 'कॉल' : 'Call'}</span>
                         </span>
                       </a>
+
                       <a
                         href="tel:+919172538720"
-                        className="inline-flex items-center gap-1.5 flex-wrap text-orange-800 hover:text-orange-950 font-bold bg-orange-50 px-2.5 py-1.5 rounded-lg border border-orange-200"
+                        className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-orange-50/90 hover:bg-orange-100/90 border border-orange-200 transition group w-full"
                       >
-                        <span>+91 91725 38720</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-semibold text-slate-700 truncate">
+                            {language === 'mr' ? 'कार्यालय संपर्क (जयसिंगपूर दरबार)' : 'Office Contact (Jaysingpur Darbar)'}
+                          </p>
+                          <span className="text-xs sm:text-sm font-black text-orange-950 font-mono tracking-wide block mt-0.5">
+                            +91 91725 38720
+                          </span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 text-white font-bold text-[11px] shrink-0 shadow-2xs group-hover:bg-orange-700 transition">
+                          <Phone className="w-3 h-3" />
+                          <span>{language === 'mr' ? 'कॉल' : 'Call'}</span>
+                        </span>
                       </a>
                     </div>
                   </div>
                 </div>
 
                 {/* Email */}
-                <div className="flex items-center gap-2 pt-1">
-                  <Mail className="w-4 h-4 text-orange-600 shrink-0" />
-                  <p className="flex items-center gap-1.5 flex-wrap">
-                    <strong className="text-slate-900">{language === 'mr' ? 'ईमेल: ' : 'Email: '}</strong>
+                <div className="flex items-start gap-2 pt-2 border-t border-slate-100">
+                  <Mail className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <span className="font-bold text-slate-900 text-xs block mb-0.5">
+                      {language === 'mr' ? 'अधिकृत ईमेल:' : 'Official Email:'}
+                    </span>
                     <a
                       href={`mailto:${GURUPITH_INFO.email}`}
-                      className="text-orange-800 font-bold hover:underline"
+                      className="text-orange-900 font-bold hover:underline break-all text-xs block"
                     >
                       {GURUPITH_INFO.email}
                     </a>
-                  </p>
+                  </div>
                 </div>
 
                 {/* Darshan Timings */}
@@ -391,6 +468,57 @@ export const MuhuratAndSevaMargView: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen Direct Murti Darshan Modal */}
+      {showFullDarshan && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-3 sm:p-5 animate-in fade-in"
+        >
+          {/* Top Bar with Title & Close Button */}
+          <div className="w-full max-w-xl flex items-center justify-between text-white pt-2 px-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              <div>
+                <h3 className="font-black text-sm sm:text-base text-amber-100">
+                  {language === 'mr' ? 'प्रत्यक्ष मूर्ती दर्शन' : 'Shree Swami Samarth Darshan'}
+                </h3>
+                <p className="text-[11px] text-amber-300/80">
+                  {language === 'mr' ? 'जयसिंगपूर सेवा दरबार' : 'Jaysingpur Seva Darbar'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowFullDarshan(false)}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition active:scale-90"
+              aria-label="Close Darshan"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Full High-Resolution Uncropped Murti Frame */}
+          <div className="relative flex-1 w-full max-w-md flex items-center justify-center my-2 overflow-hidden rounded-3xl border-2 border-amber-400/50 shadow-2xl bg-black">
+            <img
+              src="/assets/aistudio/img_2912_1024_edcd846d.jpg"
+              alt="श्री स्वामी समर्थ प्रत्यक्ष मूर्ती दर्शन"
+              className="w-full h-full object-contain"
+            />
+          </div>
+
+          {/* Auspicious Chanting Footer */}
+          <div className="w-full max-w-xl text-center space-y-1 pb-2">
+            <p className="text-sm sm:text-base font-black text-amber-300 tracking-wide">
+              ॥ श्री स्वामी समर्थ जय जय स्वामी समर्थ ॥
+            </p>
+            <p className="text-xs text-stone-300 font-medium">
+              {language === 'mr' ? 'भिऊ नकोस मी तुझ्या पाठीशी आहे' : 'Fear not, I am always with you'}
+            </p>
           </div>
         </div>
       )}

@@ -96,13 +96,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </button>
 
           <div className="text-center min-w-0 flex-1 px-1">
-            {/* Month & Year Title with Compact Selectors */}
-            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            {/* Month & Year Title with Compact Selectors - Clean non-wrapping row */}
+            <div className="flex items-center justify-center gap-2">
               <div className="relative inline-block">
                 <select
                   value={currentMonth}
                   onChange={e => onChangeMonth(parseInt(e.target.value, 10))}
-                  className="appearance-none cursor-pointer bg-transparent text-lg sm:text-2xl font-black text-orange-950 pr-5 py-0.5 text-center focus:outline-none hover:text-orange-700"
+                  className="appearance-none cursor-pointer bg-transparent text-lg sm:text-2xl font-black text-orange-950 pr-5 py-0.5 text-center focus:outline-none hover:text-orange-700 whitespace-nowrap"
                   aria-label="महिना निवडा"
                 >
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(mNum => (
@@ -119,11 +119,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </div>
 
               {/* Year Dropdown Badge */}
-              <div className="relative inline-block">
+              <div className="relative inline-block shrink-0">
                 <select
                   value={currentYear}
                   onChange={e => onChangeYear(parseInt(e.target.value, 10))}
-                  className="appearance-none cursor-pointer bg-orange-100 hover:bg-orange-200 text-orange-950 font-black text-xs sm:text-sm px-2.5 py-1 rounded-lg border border-orange-300 pr-5 focus:outline-none"
+                  className="appearance-none cursor-pointer bg-orange-100 hover:bg-orange-200 text-orange-950 font-black text-xs sm:text-sm px-2.5 py-1 rounded-lg border border-orange-300 pr-5 focus:outline-none whitespace-nowrap"
                   aria-label="वर्ष निवडा"
                 >
                   {SUPPORTED_YEARS.map(yr => (
@@ -140,7 +140,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </div>
             </div>
 
-            <p className="text-[11px] sm:text-xs font-bold text-amber-900 mt-0.5 truncate">
+            <p className="text-[11px] sm:text-xs font-bold text-amber-900 mt-0.5 whitespace-nowrap">
               {meta.samvatsar} • {meta.marathiSeason}
             </p>
           </div>
@@ -198,9 +198,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* VIEW MODE 1: CALENDAR GRID */}
       {viewMode === 'grid' && (
         <div className="space-y-3 sm:space-y-4">
-          <div className="rounded-2xl sm:rounded-3xl bg-white p-2 sm:p-3.5 shadow-xs border border-orange-200 overflow-hidden">
+          <div className="rounded-2xl sm:rounded-3xl bg-white p-2 sm:p-3.5 shadow-xs border border-orange-200 overflow-hidden relative">
+            {/* Subtle Sacred Watermark of Shree Swami Samarth Jaysingpur Murti */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.05] select-none z-0">
+              <img
+                src="/pwa-512x512.png"
+                alt=""
+                className="w-64 h-64 sm:w-80 sm:h-80 object-contain filter grayscale contrast-125"
+              />
+            </div>
+
             {/* Days of Week Header with high contrast */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 pb-2 border-b border-orange-200 text-center font-extrabold text-[11px] sm:text-xs">
+            <div className="relative z-10 grid grid-cols-7 gap-1 sm:gap-2 pb-2 border-b border-orange-200 text-center font-extrabold text-[11px] sm:text-xs">
               {[0, 1, 2, 3, 4, 5, 6].map(idx => (
                 <div
                   key={idx}
@@ -223,7 +232,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
 
             {/* 7-column Calendar Cells - Clean, Spacious, Highly Readable */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 pt-2">
+            <div className="relative z-10 grid grid-cols-7 gap-1 sm:gap-1.5 pt-2">
               {grid.map((day, idx) => {
                 if (!day) {
                   return (
@@ -269,41 +278,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   cellBg = 'bg-orange-100 border-orange-600 ring-2 ring-orange-500 shadow-xs';
                 }
 
-                // Determine single best label to show in the cell (Clean & Non-cluttered)
-                let cellLabel = '';
-                let cellLabelStyle = 'text-slate-600 font-semibold';
-
-                if (day.festivals.length > 0) {
-                  // Festival: show clean short festival title
-                  const festTitle = language === 'en' ? day.festivals[0].titleEn : day.festivals[0].title;
-                  cellLabel = festTitle.split('(')[0].trim();
-                  cellLabelStyle = 'text-orange-950 font-extrabold bg-orange-100/90 px-1 rounded';
-                } else if (day.isEkadashi) {
-                  cellLabel = language === 'mr' ? 'एकादशी' : 'Ekadashi';
-                  cellLabelStyle = 'text-purple-950 font-bold bg-purple-100/90 px-1 rounded';
-                } else if (day.isSankashti) {
-                  cellLabel = language === 'mr' ? 'संकष्टी' : 'Sankashti';
-                  cellLabelStyle = 'text-rose-950 font-bold bg-rose-100/90 px-1 rounded';
-                } else if (day.isPournima) {
-                  cellLabel = language === 'mr' ? 'पौर्णिमा' : 'Pournima';
-                  cellLabelStyle = 'text-amber-950 font-bold bg-amber-100 px-1 rounded';
-                } else if (day.isAmavasya) {
-                  cellLabel = language === 'mr' ? 'अमावास्या' : 'Amavasya';
-                  cellLabelStyle = 'text-slate-900 font-bold bg-slate-200 px-1 rounded';
-                } else {
-                  // Normal day: show full tithi cleanly (No cryptic abbreviations!)
-                  cellLabel = day.tithi;
-                  cellLabelStyle = 'text-slate-500 font-medium';
-                }
+                // Clean, unclipped Marathi Tithi (ALWAYS legible without truncation!)
+                const tithiLabel = day.tithi;
+                const hasFestival = day.festivals.length > 0;
 
                 return (
                   <button
                     key={day.date}
                     onClick={() => onSelectDay(day)}
                     aria-label={`${day.dayOfMonth} ${getMonthName(meta.monthNumber)}, ${day.tithi}`}
-                    className={`relative flex flex-col justify-between p-1 sm:p-1.5 min-h-[58px] sm:min-h-[72px] rounded-xl border text-left transition-all active:scale-95 overflow-hidden shadow-2xs ${cellBg}`}
+                    className={`relative flex flex-col justify-between p-1 sm:p-1.5 min-h-[62px] sm:min-h-[76px] rounded-xl border text-left transition-all active:scale-95 overflow-hidden shadow-2xs ${cellBg}`}
                   >
-                    {/* Top Row: Date Number & Auspicious Indicator */}
+                    {/* Top Row: Date Number & Auspicious Indicators */}
                     <div className="flex items-center justify-between w-full leading-none">
                       <span className={`text-xs sm:text-base font-black ${isToday ? 'text-emerald-700' : dateColor}`}>
                         {day.dayOfMonth}
@@ -322,8 +308,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         {day.isAmavasya && (
                           <span className="text-[10px] leading-none" title="अमावास्या">🌑</span>
                         )}
-                        {day.festivals.length > 0 && !day.isSwamiSpecial && !day.isPournima && !day.isAmavasya && (
-                          <span className="w-2 h-2 rounded-full bg-orange-600" title="सण / उत्सव" />
+                        {hasFestival && !day.isSwamiSpecial && !day.isPournima && !day.isAmavasya && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-orange-600 ring-1 ring-amber-300" title="सण / उत्सव" />
                         )}
                         {hasSavedNote && (
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-600" title="नोंद" />
@@ -331,11 +317,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Bottom Row: High-Contrast Readable Tag */}
-                    <div className="w-full mt-auto pt-0.5">
-                      <p className={`text-[8px] sm:text-[9.5px] truncate leading-tight ${cellLabelStyle}`} title={cellLabel}>
-                        {cellLabel}
+                    {/* Middle/Bottom: Clean, Never-truncated Tithi + Festival indicator badge */}
+                    <div className="w-full mt-auto pt-0.5 space-y-0.5 text-center">
+                      <p className={`text-[9px] sm:text-[10.5px] font-bold leading-tight whitespace-nowrap ${
+                        day.isSwamiSpecial
+                          ? 'text-orange-950 font-black'
+                          : day.isEkadashi
+                          ? 'text-purple-900 font-extrabold'
+                          : day.isSankashti
+                          ? 'text-rose-900 font-extrabold'
+                          : day.isPournima
+                          ? 'text-amber-950 font-black'
+                          : day.isAmavasya
+                          ? 'text-slate-950 font-black'
+                          : 'text-slate-700'
+                      }`}>
+                        {tithiLabel}
                       </p>
+
+                      {hasFestival && (
+                        <div className="w-full flex items-center justify-center">
+                          <span className="inline-block px-1 py-0.2 rounded bg-orange-600 text-white text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-tighter whitespace-nowrap leading-tight shadow-2xs">
+                            {language === 'mr' ? 'सण' : 'Utsav'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </button>
                 );
@@ -347,11 +353,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           {activePreviewDay && (
             <div className="rounded-2xl sm:rounded-3xl bg-white p-3.5 sm:p-4 shadow-sm border border-orange-200 space-y-2.5">
               <div className="flex items-center justify-between border-b border-orange-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-orange-600 text-white flex flex-col items-center justify-center font-black shrink-0 shadow-2xs">
-                    <span className="text-base leading-none">{activePreviewDay.dayOfMonth}</span>
-                    <span className="text-[8px] font-bold leading-none mt-0.5">
-                      {getDayName(activePreviewDay.dayOfWeek, true)}
+                <div className="flex items-center gap-2.5">
+                  <div className="relative shrink-0">
+                    <img
+                      src="/pwa-192x192.png"
+                      alt="श्री स्वामी समर्थ"
+                      className="w-11 h-11 rounded-xl object-cover ring-2 ring-amber-300 shadow-2xs"
+                    />
+                    <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-600 text-[9px] font-black text-white border border-white">
+                      {activePreviewDay.dayOfMonth}
                     </span>
                   </div>
                   <div>

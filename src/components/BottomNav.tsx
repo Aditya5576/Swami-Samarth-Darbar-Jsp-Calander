@@ -66,7 +66,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onChangeTab }) 
               >
                 <Icon className="w-5 h-5 sm:w-5 sm:h-5" />
               </div>
-              <span className="text-[10px] sm:text-[11px] leading-tight mt-0.5 truncate max-w-full">
+              <span className="text-[10px] sm:text-[11px] leading-tight mt-0.5 whitespace-nowrap text-center">
                 {tab.label}
               </span>
               {isActive && (
