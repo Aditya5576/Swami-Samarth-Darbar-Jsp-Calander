@@ -11,8 +11,11 @@ import {
   CheckCircle,
   Save,
   Bell,
-  Share2
+  Share2,
+  Clock,
+  ShieldAlert,
 } from 'lucide-react';
+import { calculateRahuKaal, formatSunriseSunset } from '../utils/calendarLogic';
 
 interface DayDetailsModalProps {
   day: DayData | null;
@@ -59,6 +62,8 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
       }).catch(() => {});
     }
   };
+
+  const pakshaLabel = language === 'en' ? (day.paksha === 'शुक्ल' ? 'Shukla' : 'Krishna') : day.paksha;
 
   return (
     <div
@@ -124,10 +129,10 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
 
           {/* Quick Badges in Header */}
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <span className="px-2 py-0.5 rounded-md bg-white/20 text-[11px] font-semibold text-white">
-              {t('tithi')}: {day.tithi} ({day.paksha} {t('paksha')})
+            <span className="px-2 py-0.5 rounded-md bg-white/20 text-[11px] font-semibold text-white whitespace-nowrap">
+              {t('tithi')}: {day.tithi} ({pakshaLabel} {t('paksha')})
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-white/20 text-[11px] font-semibold text-white">
+            <span className="px-2 py-0.5 rounded-md bg-white/20 text-[11px] font-semibold text-white whitespace-nowrap">
               {t('nakshatra')}: {day.nakshatra}
             </span>
           </div>
@@ -135,44 +140,99 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
-          {/* Panchang Timings Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-orange-50/70 border border-orange-100">
-              <Sunrise className="w-4 h-4 text-orange-600 shrink-0" />
-              <div>
-                <p className="text-[10px] text-slate-500 font-medium">{t('sunrise')}</p>
-                <p className="font-bold text-slate-800">{day.sunrise}</p>
-              </div>
-            </div>
+          {/* Panchang Timings Strip with Rahu Kaal */}
+          {(() => {
+            const rahuKaal = calculateRahuKaal(day.dayOfWeek, day.sunrise, day.sunset, language);
+            return (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-orange-50/70 border border-orange-100 min-w-0">
+                    <Sunrise className="w-4 h-4 text-orange-600 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-slate-500 font-medium leading-none">{t('sunrise')}</p>
+                      <p className="font-bold text-slate-800 truncate whitespace-nowrap mt-1">
+                        {formatSunriseSunset(day.sunrise, false, language)}
+                      </p>
+                    </div>
+                  </div>
 
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-orange-50/70 border border-orange-100">
-              <Sunset className="w-4 h-4 text-amber-700 shrink-0" />
-              <div>
-                <p className="text-[10px] text-slate-500 font-medium">{t('sunset')}</p>
-                <p className="font-bold text-slate-800">{day.sunset}</p>
-              </div>
-            </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-orange-50/70 border border-orange-100 min-w-0">
+                    <Sunset className="w-4 h-4 text-amber-700 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-slate-500 font-medium leading-none">{t('sunset')}</p>
+                      <p className="font-bold text-slate-800 truncate whitespace-nowrap mt-1">
+                        {formatSunriseSunset(day.sunset, true, language)}
+                      </p>
+                    </div>
+                  </div>
 
-            {day.festivals.some(f => f.moonriseTime) ? (
-              <div className="col-span-2 sm:col-span-1 flex items-center gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200">
-                <Moon className="w-4 h-4 text-rose-600 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-rose-700 font-medium">{t('moonriseTime')}</p>
-                  <p className="font-bold text-rose-900">
-                    {day.festivals.find(f => f.moonriseTime)?.moonriseTime}
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-50/70 border border-red-200 min-w-0">
+                    <Clock className="w-4 h-4 text-red-600 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-red-700 font-bold leading-none">{t('rahuKaal')}</p>
+                      <p className="font-black text-red-950 text-[11px] truncate whitespace-nowrap mt-1">{rahuKaal.start}</p>
+                    </div>
+                  </div>
+
+                  {day.festivals.some(f => f.moonriseTime) ? (
+                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 min-w-0">
+                      <Moon className="w-4 h-4 text-rose-600 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-rose-700 font-medium leading-none">{t('moonriseTime')}</p>
+                        <p className="font-bold text-rose-900 truncate whitespace-nowrap mt-1">
+                          {day.festivals.find(f => f.moonriseTime)?.moonriseTime}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-100 min-w-0">
+                      <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-slate-500 font-medium leading-none">{t('shubhDin')}</p>
+                        <p className="font-bold text-slate-800 truncate whitespace-nowrap mt-1">{getDayName(day.dayOfWeek)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dedicated Real Vedic Rahu Kaal Timing Block */}
+                <div className="rounded-2xl bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100/50 p-3.5 border border-amber-300 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Clock className="w-4 h-4 text-orange-700 shrink-0" />
+                      <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-black text-xs sm:text-sm text-orange-950 uppercase tracking-wide whitespace-nowrap">
+                          {t('rahuKaal')}
+                        </span>
+                        <span className="text-[11px] font-semibold text-amber-900 truncate">
+                          ({rahuKaal.periodName})
+                        </span>
+                      </div>
+                    </div>
+                    <span className="shrink-0 px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-black border border-red-200 whitespace-nowrap shadow-2xs">
+                      {t('rahuKaalStatus')}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between gap-2 flex-wrap pt-0.5">
+                    <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight font-mono whitespace-nowrap">
+                      {rahuKaal.formattedRange}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase shrink-0 whitespace-nowrap">
+                      ({language === 'mr' ? 'अचूक वैदिक पंचांग' : 'Exact Vedic Timing'})
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-amber-950/90 leading-relaxed font-medium bg-white/70 p-2.5 rounded-xl border border-amber-200/60">
+                    <span className="font-bold text-orange-900">
+                      {language === 'mr' ? '⚠️ शास्त्र नियम:' : '⚠️ Vedic Advice:'}
+                    </span>{' '}
+                    {language === 'mr' ? rahuKaal.guidanceMr : rahuKaal.guidanceEn}
                   </p>
                 </div>
-              </div>
-            ) : (
-              <div className="col-span-2 sm:col-span-1 flex items-center gap-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-100">
-                <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-slate-500 font-medium">{t('shubhDin')}</p>
-                  <p className="font-bold text-slate-800">{getDayName(day.dayOfWeek)}</p>
-                </div>
-              </div>
-            )}
-          </div>
+              </>
+            );
+          })()}
 
           {/* Festivals & Events Section */}
           {day.festivals.length > 0 && (

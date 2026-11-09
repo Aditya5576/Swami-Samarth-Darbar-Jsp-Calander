@@ -162,35 +162,35 @@ export const MuhuratAndSevaMargView: React.FC = () => {
             </div>
 
             {/* Address & Contact Box */}
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-orange-100 space-y-2.5 text-xs text-slate-700">
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-orange-100 space-y-2.5 text-xs text-slate-700 overflow-hidden">
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-                <p className="leading-snug">
+                <div className="min-w-0 flex-1 leading-snug">
                   <strong className="text-slate-900">{language === 'mr' ? 'पत्ता: ' : 'Address: '}</strong>
-                  {language === 'mr' ? GURUPITH_INFO.localKendraAddress : GURUPITH_INFO.localKendraAddressEn}
-                </p>
+                  <span>{language === 'mr' ? GURUPITH_INFO.localKendraAddress : GURUPITH_INFO.localKendraAddressEn}</span>
+                </div>
               </div>
 
               {/* Contacts */}
-              <div className="pt-1.5 border-t border-slate-100 space-y-1.5">
+              <div className="pt-2 border-t border-slate-100 space-y-2">
                 <div className="flex items-start gap-2">
                   <Phone className="w-4 h-4 text-orange-600 shrink-0 mt-1" />
-                  <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <p className="font-bold text-slate-900 text-xs">{language === 'mr' ? 'संपर्क अधिकारी:' : 'Contacts:'}</p>
                     <div className="space-y-2 w-full">
                       <a
                         href="tel:+919960401550"
-                        className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-orange-50/90 hover:bg-orange-100/90 border border-orange-200 transition group w-full"
+                        className="flex items-center justify-between gap-2 p-2 sm:p-2.5 rounded-xl bg-orange-50/90 hover:bg-orange-100/90 border border-orange-200 transition group w-full min-w-0"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-[11px] font-semibold text-slate-700 truncate">
                             {language === 'mr' ? 'श्री गोवर्धन डबाडे (अण्णा)' : 'Shri Govardhan Dabade (Anna)'}
                           </p>
-                          <span className="text-xs sm:text-sm font-black text-orange-950 font-mono tracking-wide block mt-0.5">
+                          <span className="text-xs sm:text-sm font-black text-orange-950 font-mono tracking-wide block mt-0.5 whitespace-nowrap">
                             +91 99604 01550
                           </span>
                         </div>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 text-white font-bold text-[11px] shrink-0 shadow-2xs group-hover:bg-orange-700 transition">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 text-white font-bold text-[11px] shrink-0 shadow-2xs group-hover:bg-orange-700 transition whitespace-nowrap">
                           <Phone className="w-3 h-3" />
                           <span>{language === 'mr' ? 'कॉल' : 'Call'}</span>
                         </span>
@@ -198,17 +198,17 @@ export const MuhuratAndSevaMargView: React.FC = () => {
 
                       <a
                         href="tel:+919172538720"
-                        className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-orange-50/90 hover:bg-orange-100/90 border border-orange-200 transition group w-full"
+                        className="flex items-center justify-between gap-2 p-2 sm:p-2.5 rounded-xl bg-orange-50/90 hover:bg-orange-100/90 border border-orange-200 transition group w-full min-w-0"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-[11px] font-semibold text-slate-700 truncate">
                             {language === 'mr' ? 'कार्यालय संपर्क (जयसिंगपूर दरबार)' : 'Office Contact (Jaysingpur Darbar)'}
                           </p>
-                          <span className="text-xs sm:text-sm font-black text-orange-950 font-mono tracking-wide block mt-0.5">
+                          <span className="text-xs sm:text-sm font-black text-orange-950 font-mono tracking-wide block mt-0.5 whitespace-nowrap">
                             +91 91725 38720
                           </span>
                         </div>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 text-white font-bold text-[11px] shrink-0 shadow-2xs group-hover:bg-orange-700 transition">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 text-white font-bold text-[11px] shrink-0 shadow-2xs group-hover:bg-orange-700 transition whitespace-nowrap">
                           <Phone className="w-3 h-3" />
                           <span>{language === 'mr' ? 'कॉल' : 'Call'}</span>
                         </span>
@@ -234,12 +234,14 @@ export const MuhuratAndSevaMargView: React.FC = () => {
                 </div>
 
                 {/* Darshan Timings */}
-                <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-                  <Clock className="w-4 h-4 text-orange-600 shrink-0" />
-                  <p>
+                <div className="flex items-start sm:items-center gap-2 pt-2 border-t border-slate-100">
+                  <Clock className="w-4 h-4 text-orange-600 shrink-0 mt-0.5 sm:mt-0" />
+                  <div className="min-w-0 flex-1 text-xs">
                     <strong className="text-slate-900">{language === 'mr' ? 'दर्शन वेळ: ' : 'Darshan: '}</strong>
-                    <span>{GURUPITH_INFO.darshanTimings}</span>
-                  </p>
+                    <span className="font-medium text-slate-800">
+                      {language === 'mr' ? GURUPITH_INFO.darshanTimings : (GURUPITH_INFO.darshanTimingsEn || GURUPITH_INFO.darshanTimings)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -341,7 +343,8 @@ export const MuhuratAndSevaMargView: React.FC = () => {
               ))}
             </div>
             <p className="text-slate-700 pt-1 text-[11px] leading-relaxed">
-              <strong className="text-orange-900">{t('freeMahaprasad')}</strong> {GURUPITH_INFO.mahaPrasadTimings}
+              <strong className="text-orange-900">{t('freeMahaprasad')}</strong>{' '}
+              {language === 'mr' ? GURUPITH_INFO.mahaPrasadTimings : (GURUPITH_INFO.mahaPrasadTimingsEn || GURUPITH_INFO.mahaPrasadTimings)}
             </p>
           </div>
         </div>

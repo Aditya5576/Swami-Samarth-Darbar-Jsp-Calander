@@ -36,6 +36,7 @@ export interface DayData {
   nakshatra: string;
   sunrise: string;
   sunset: string;
+  rahuKaal?: string;
   isToday?: boolean;
   isSankashti?: boolean;
   isEkadashi?: boolean;

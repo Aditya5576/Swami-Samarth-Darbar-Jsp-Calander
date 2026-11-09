@@ -168,3 +168,128 @@ export function searchYear(query: string, year: number = 2026): DayData[] {
 
 // Backward compatibility helper
 export const searchYear2026 = (q: string) => searchYear(q, 2026);
+
+/**
+ * Astronomical Calculation of Rahu Kaal (राहुकाळ)
+ * In Vedic astrology, the daylight duration (Sunrise to Sunset) is divided into 8 equal octants.
+ * Each weekday has a specific octant allocated to Rahu:
+ * Sunday: 8th octant (late afternoon before sunset)
+ * Monday: 2nd octant (early morning)
+ * Tuesday: 7th octant (late afternoon)
+ * Wednesday: 5th octant (midday)
+ * Thursday: 6th octant (early afternoon)
+ * Friday: 4th octant (late morning)
+ * Saturday: 3rd octant (mid morning)
+ */
+export function parseTimeToMinutes(timeStr?: string, isSunset: boolean = false): number {
+  if (!timeStr) return isSunset ? 18 * 60 + 25 : 6 * 60 + 28;
+  const isNightOrPm = /सायं|रात्री|pm/i.test(timeStr) || isSunset;
+  const cleaned = timeStr.replace(/(सकाळी|सायं|दुपारी|रात्री|am|pm|\s)/gi, '').trim();
+  const enDigits = cleaned.replace(/[०-९]/g, d => '०१२३४५६७८९'.indexOf(d).toString());
+  const parts = enDigits.split(':');
+  let h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) || 0;
+  if (isNaN(h)) h = isSunset ? 18 : 6;
+  if (isNightOrPm && h < 12) {
+    h += 12;
+  }
+  return h * 60 + m;
+}
+
+export function formatMinutesToTime(min: number, lang: 'mr' | 'en' = 'mr'): string {
+  const h24 = Math.floor(min / 60) % 24;
+  const m = Math.floor(min % 60);
+  let period = lang === 'mr' ? 'सकाळी' : 'AM';
+  let h12 = h24;
+  if (h24 >= 12 && h24 < 16) {
+    period = lang === 'mr' ? 'दुपारी' : 'PM';
+    if (h24 > 12) h12 = h24 - 12;
+  } else if (h24 >= 16 && h24 < 20) {
+    period = lang === 'mr' ? 'सायं' : 'PM';
+    h12 = h24 - 12;
+  } else if (h24 >= 20) {
+    period = lang === 'mr' ? 'रात्री' : 'PM';
+    h12 = h24 - 12;
+  } else if (h24 === 0) {
+    h12 = 12;
+  } else if (h24 > 12) {
+    period = lang === 'mr' ? 'सायं' : 'PM';
+    h12 = h24 - 12;
+  }
+
+  const mm = String(m).padStart(2, '0');
+  const hh = String(h12).padStart(2, '0');
+
+  if (lang === 'mr') {
+    const toMr = (s: string) => s.replace(/[0-9]/g, d => '०१२३४५६७८९'[parseInt(d, 10)]);
+    return `${period} ${toMr(hh)}:${toMr(mm)}`;
+  }
+  return `${hh}:${mm} ${period}`;
+}
+
+/**
+ * Cleanly localizes and formats sunrise/sunset strings for UI display in English or Marathi.
+ */
+export function formatSunriseSunset(
+  timeStr?: string,
+  isSunset: boolean = false,
+  lang: 'mr' | 'en' = 'mr'
+): string {
+  if (!timeStr) return '';
+  const min = parseTimeToMinutes(timeStr, isSunset);
+  return formatMinutesToTime(min, lang);
+}
+
+export interface RahuKaalDetail {
+  start: string;
+  end: string;
+  formattedRange: string;
+  octantNumber: number;
+  periodName: string;
+  guidanceMr: string;
+  guidanceEn: string;
+}
+
+export function calculateRahuKaal(
+  dayOfWeek: number,
+  sunriseStr?: string,
+  sunsetStr?: string,
+  lang: 'mr' | 'en' = 'mr'
+): RahuKaalDetail {
+  const sunriseMin = parseTimeToMinutes(sunriseStr, false);
+  const sunsetMin = parseTimeToMinutes(sunsetStr, true);
+  const dayDuration = Math.max(sunsetMin - sunriseMin, 11 * 60);
+  const octantDuration = dayDuration / 8;
+
+  // Day of week: 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday
+  const octantMap: Record<number, { oct: number; nameMr: string; nameEn: string }> = {
+    0: { oct: 8, nameMr: '८ वा प्रहर (सायंकाळ)', nameEn: '8th Octant · Evening' },
+    1: { oct: 2, nameMr: '२ रा प्रहर (सकाळ)', nameEn: '2nd Octant · Morning' },
+    2: { oct: 7, nameMr: '७ वा प्रहर (दुपार/सायंकाळ)', nameEn: '7th Octant · Late Afternoon' },
+    3: { oct: 5, nameMr: '५ वा प्रहर (मध्यान्ह)', nameEn: '5th Octant · Midday' },
+    4: { oct: 6, nameMr: '६ वा प्रहर (दुपार)', nameEn: '6th Octant · Early Afternoon' },
+    5: { oct: 4, nameMr: '४ था प्रहर (सकाळ)', nameEn: '4th Octant · Late Morning' },
+    6: { oct: 3, nameMr: '३ रा प्रहर (सकाळ)', nameEn: '3rd Octant · Mid Morning' },
+  };
+
+  const info = octantMap[dayOfWeek] || octantMap[0];
+  const startMin = sunriseMin + (info.oct - 1) * octantDuration;
+  const endMin = sunriseMin + info.oct * octantDuration;
+
+  const startFormatted = formatMinutesToTime(startMin, lang);
+  const endFormatted = formatMinutesToTime(endMin, lang);
+  const formattedRange = lang === 'mr'
+    ? `${startFormatted} ते ${endFormatted}`
+    : `${startFormatted} – ${endFormatted}`;
+
+  return {
+    start: startFormatted,
+    end: endFormatted,
+    formattedRange,
+    octantNumber: info.oct,
+    periodName: lang === 'mr' ? info.nameMr : info.nameEn,
+    guidanceMr: 'राहुकाळात नवीन संकल्प, प्रवास, मोठी खरेदी व शुभ कार्ये वर्ज्य मानली जातात. या काळात केवळ श्री स्वामी समर्थ नामस्मरण करावे.',
+    guidanceEn: 'Auspicious deeds, travel, and major purchases are avoided during Rahu Kaal. Devotees chant Shree Swami Samarth naam.',
+  };
+}
+

@@ -19,12 +19,14 @@ import { DayData } from './types/calendar';
 import { getTodayDateInfo } from './utils/calendarLogic';
 import { initDailyNotificationScheduler } from './utils/notificationService';
 import { templeSound } from './utils/audioChime';
+import { SplashScreen } from './components/SplashScreen';
 import { ExternalLink, Sparkles, MapPin, Phone } from 'lucide-react';
 import { GURUPITH_INFO } from './data/calendar2026Data';
 
 function AppContent() {
   const { language, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<MainTabType>('calendar');
+  const [showSplash, setShowSplash] = useState(true);
 
   // Automatic today date detection: dynamically opens today's year, month & date!
   const todayInfo = getTodayDateInfo();
@@ -84,6 +86,7 @@ function AppContent() {
         onOpenSearch={() => setIsSearchOpen(true)}
         onGoToToday={handleGoToToday}
         onOpenNotifications={() => setIsNotificationOpen(true)}
+        onOpenSplash={() => setShowSplash(true)}
       />
 
       {/* Main Content Area */}
@@ -199,6 +202,9 @@ function AppContent() {
 
       {/* Offline Toast Indicator */}
       <OfflineIndicator />
+
+      {/* Devotional Splash Screen featuring Jaysingpur Murti Photo */}
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
 
       {/* Mobile-first Bottom Navigation Bar */}
       <BottomNav

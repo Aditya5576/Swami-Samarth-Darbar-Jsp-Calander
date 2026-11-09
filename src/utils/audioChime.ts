@@ -57,7 +57,7 @@ class TempleSoundManager {
 
       // 1. Try fetching from public/audio/swami_samarth_chant.mp3
       try {
-        const resp = await fetch('/audio/swami_samarth_chant.mp3?v=9', { cache: 'force-cache' });
+        const resp = await fetch('/audio/swami_samarth_chant.mp3?v=11', { cache: 'no-cache' });
         if (resp.ok) {
           arrayBuffer = await resp.arrayBuffer();
         }

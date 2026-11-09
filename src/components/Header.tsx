@@ -9,6 +9,7 @@ interface HeaderProps {
   onOpenSearch: () => void;
   onGoToToday: () => void;
   onOpenNotifications: () => void;
+  onOpenSplash?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSearch,
   onGoToToday,
   onOpenNotifications,
+  onOpenSplash,
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const [notifActive, setNotifActive] = useState(true);
@@ -34,8 +36,13 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Brand & Temple Identity - Generous width, NEVER truncates! */}
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
           {/* Temple Emblem Medallion with Jaysingpur Murti */}
-          <div className="relative shrink-0">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 p-0.5 shadow-sm ring-1 ring-amber-300/80 flex items-center justify-center overflow-hidden">
+          <button
+            type="button"
+            onClick={onOpenSplash}
+            title={language === 'mr' ? 'दर्शन स्क्रीन पहा' : 'View Splash Darshan'}
+            className="relative shrink-0 active:scale-95 transition cursor-pointer group"
+          >
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 p-0.5 shadow-sm ring-1 ring-amber-300/80 group-hover:ring-amber-200 flex items-center justify-center overflow-hidden">
               <img
                 src="/pwa-192x192.png"
                 alt="श्री स्वामी समर्थ सेवा केंद्र जयसिंगपूर"
@@ -45,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-600 text-[8px] font-black text-amber-100 border border-amber-200">
               ॐ
             </span>
-          </div>
+          </button>
 
           {/* Title & Location Header - Clean, prominent, no awkward wrapping */}
           <div className="min-w-0 flex-1">

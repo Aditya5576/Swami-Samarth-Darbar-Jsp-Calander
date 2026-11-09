@@ -747,6 +747,7 @@ export const GURUPITH_INFO = {
   headquartersAddress: 'त्र्यंबकेश्वर, जि. नाशिक, महाराष्ट्र',
   headquartersPhone: '+९१ (०२५९४) २३४२५३',
   darshanTimings: 'सकाळी ०६:०० ते रात्री ०९:३० (दररोज)',
+  darshanTimingsEn: '06:00 AM to 09:30 PM (Daily)',
   aartiTimings: [
     { name: 'काकड आरती', time: 'सकाळी ०५:३०' },
     { name: 'दुपारची आरती', time: 'दुपारी १२:००' },
@@ -754,6 +755,7 @@ export const GURUPITH_INFO = {
     { name: 'शेजारती', time: 'रात्री ०९:३०' }
   ],
   mahaPrasadTimings: 'दुपारी १२:०० ते ०२:३० आणि सायं ०७:३० ते ०९:३० (महाप्रसाद)',
+  mahaPrasadTimingsEn: '12:00 PM to 02:30 PM & 07:30 PM to 09:30 PM (Daily Mahaprasad)',
   gurumauliGuidance: 'श्री स्वामी समर्थ सेवा दरबार, जयसिंगपूर येथे भक्तांच्या सहभागाने नित्यसेवा, अन्नपूर्णा प्रतिष्ठा, संस्कार व समाजोपयोगी उपक्रम अविरत सुरू आहेत.'
 };
 

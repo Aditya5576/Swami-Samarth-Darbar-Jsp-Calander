@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DayData } from '../types/calendar';
-import { getMonthDays, getMonthGrid, getMonthMeta, getTodayDateInfo, SUPPORTED_YEARS } from '../utils/calendarLogic';
+import { getMonthDays, getMonthGrid, getMonthMeta, getTodayDateInfo, SUPPORTED_YEARS, calculateRahuKaal, formatSunriseSunset } from '../utils/calendarLogic';
 import { useLanguage } from '../context/LanguageContext';
 import {
   ChevronLeft,
@@ -13,6 +13,7 @@ import {
   Sunset,
   Moon,
   BookOpen,
+  Clock,
 } from 'lucide-react';
 
 interface CalendarViewProps {
@@ -369,14 +370,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       {formatDate(activePreviewDay.date)} ({getDayName(activePreviewDay.dayOfWeek)})
                     </h3>
                     <p className="text-xs font-bold text-orange-900 mt-0.5">
-                      {activePreviewDay.tithi} ({activePreviewDay.paksha} पक्ष) • {meta.marathiName}
+                      {activePreviewDay.tithi} ({language === 'en' ? (activePreviewDay.paksha === 'शुक्ल' ? 'Shukla' : 'Krishna') : activePreviewDay.paksha} {t('paksha')}) • {meta.marathiName}
                     </p>
                   </div>
                 </div>
 
                 <button
                   onClick={() => onSelectDay(activePreviewDay)}
-                  className="px-2.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition active:scale-95"
+                  className="px-2.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition active:scale-95 shrink-0"
                 >
                   <span>{t('viewDetails')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -406,32 +407,54 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
               )}
 
-              {/* Day Metrics Strip */}
-              <div className="grid grid-cols-3 gap-1.5 text-xs">
-                <div className="p-2 rounded-xl bg-orange-50/70 border border-orange-100 flex items-center gap-1.5">
-                  <Sunrise className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[9px] text-slate-500 font-medium leading-none">{t('sunrise')}</p>
-                    <p className="font-bold text-slate-900 mt-0.5 text-[11px]">{activePreviewDay.sunrise}</p>
-                  </div>
-                </div>
+              {/* Day Metrics Strip with Rahu Kaal */}
+              {(() => {
+                const previewRahu = calculateRahuKaal(
+                  activePreviewDay.dayOfWeek,
+                  activePreviewDay.sunrise,
+                  activePreviewDay.sunset,
+                  language
+                );
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+                    <div className="p-2 rounded-xl bg-orange-50/70 border border-orange-100 flex items-center gap-1.5 min-w-0">
+                      <Sunrise className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] text-slate-500 font-medium leading-none">{t('sunrise')}</p>
+                        <p className="font-bold text-slate-900 mt-0.5 text-[11px] truncate whitespace-nowrap">
+                          {formatSunriseSunset(activePreviewDay.sunrise, false, language)}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="p-2 rounded-xl bg-orange-50/70 border border-orange-100 flex items-center gap-1.5">
-                  <Sunset className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[9px] text-slate-500 font-medium leading-none">{t('sunset')}</p>
-                    <p className="font-bold text-slate-900 mt-0.5 text-[11px]">{activePreviewDay.sunset}</p>
-                  </div>
-                </div>
+                    <div className="p-2 rounded-xl bg-orange-50/70 border border-orange-100 flex items-center gap-1.5 min-w-0">
+                      <Sunset className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] text-slate-500 font-medium leading-none">{t('sunset')}</p>
+                        <p className="font-bold text-slate-900 mt-0.5 text-[11px] truncate whitespace-nowrap">
+                          {formatSunriseSunset(activePreviewDay.sunset, true, language)}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="p-2 rounded-xl bg-orange-50/70 border border-orange-100 flex items-center gap-1.5">
-                  <Moon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[9px] text-slate-500 font-medium leading-none">{t('nakshatra')}</p>
-                    <p className="font-bold text-slate-900 mt-0.5 text-[11px] truncate">{activePreviewDay.nakshatra}</p>
+                    <div className="p-2 rounded-xl bg-red-50/70 border border-red-200 flex items-center gap-1.5 min-w-0">
+                      <Clock className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] text-red-700 font-bold leading-none">{t('rahuKaal')}</p>
+                        <p className="font-black text-red-950 mt-0.5 text-[11px] truncate whitespace-nowrap">{previewRahu.start}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-orange-50/70 border border-orange-100 flex items-center gap-1.5 min-w-0">
+                      <Moon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] text-slate-500 font-medium leading-none">{t('nakshatra')}</p>
+                        <p className="font-bold text-slate-900 mt-0.5 text-[11px] truncate whitespace-nowrap">{activePreviewDay.nakshatra}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Swami Seva Advice */}
               <div className="p-2 rounded-xl bg-amber-50/60 border border-amber-200 text-xs text-slate-800 leading-relaxed">
