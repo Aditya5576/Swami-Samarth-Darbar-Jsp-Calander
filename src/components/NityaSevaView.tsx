@@ -1,7 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NITYA_SEVA_DATA } from '../data/calendar2026Data';
 import { templeSound } from '../utils/audioChime';
 import { useLanguage } from '../context/LanguageContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { SwamiVideosView } from './SwamiVideosView';
+import { OfflineMediaPlayer } from './OfflineMediaPlayer';
+import {
+  OfflineMediaRecord,
+  TARAK_MANTRA_MEDIA_ID,
+  getOfflineMedia,
+  saveOfflineMedia,
+  subscribeVaultChanges,
+  validateMediaFile,
+} from '../utils/offlineMediaStore';
 import {
   Volume2,
   VolumeX,
@@ -14,11 +25,20 @@ import {
   Pause,
   ExternalLink,
   Music,
+  Upload,
+  HardDrive,
+  WifiOff,
+  Gauge,
 } from 'lucide-react';
 
-export const NityaSevaView: React.FC = () => {
+interface NityaSevaViewProps {
+  onOpenOfflineVault?: () => void;
+}
+
+export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault }) => {
   const { language, t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'japa' | 'tarak_mantra' | 'aarti' | 'agnihotra' | 'atharvashirsha'>('japa');
+  const network = useNetworkStatus();
+  const [activeTab, setActiveTab] = useState<'japa' | 'tarak_mantra' | 'bhajan_videos' | 'aarti' | 'agnihotra' | 'atharvashirsha'>('japa');
 
   // Japa Mala State
   const [japaCount, setJapaCount] = useState(0);
@@ -28,9 +48,57 @@ export const NityaSevaView: React.FC = () => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
 
-  // Tarak Mantra YouTube Audio/Song Player State
+  // Tarak Mantra YouTube + Offline Vault Audio/Song Player State
   const [isPlayingTarak, setIsPlayingTarak] = useState(false);
+  const [tarakOfflineRecord, setTarakOfflineRecord] = useState<OfflineMediaRecord | null>(null);
+  const [preferTarakYouTube, setPreferTarakYouTube] = useState(false);
+  const [tarakYouTubeLoaded, setTarakYouTubeLoaded] = useState(false);
+  const [tarakSaveFeedback, setTarakSaveFeedback] = useState<string | null>(null);
   const tarakIframeRef = useRef<HTMLIFrameElement>(null);
+  const tarakFileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadTarakOfflineRecord = useCallback(async () => {
+    const rec = await getOfflineMedia(TARAK_MANTRA_MEDIA_ID);
+    setTarakOfflineRecord(rec);
+  }, []);
+
+  useEffect(() => {
+    loadTarakOfflineRecord();
+    return subscribeVaultChanges(() => {
+      loadTarakOfflineRecord();
+    });
+  }, [loadTarakOfflineRecord]);
+
+  const handleSaveTarakOffline = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const check = validateMediaFile(file);
+    if (!check.valid) {
+      setTarakSaveFeedback(language === 'mr' ? check.errorMr || 'अवैध फाईल' : check.errorEn || 'Invalid file');
+      window.setTimeout(() => setTarakSaveFeedback(null), 4000);
+      return;
+    }
+    try {
+      await saveOfflineMedia(
+        TARAK_MANTRA_MEDIA_ID,
+        language === 'mr' ? 'संपूर्ण तारक मंत्र - श्री स्वामी समर्थ' : 'Complete Tarak Mantra - Suvarna Bhakti',
+        file
+      );
+      setPreferTarakYouTube(false);
+      await loadTarakOfflineRecord();
+      setTarakSaveFeedback(
+        language === 'mr'
+          ? 'तारक मंत्र ऑफलाईन वॉल्टमध्ये सुरक्षित सेव्ह झाला!'
+          : 'Tarak Mantra saved to Offline Vault! Ready without internet.'
+      );
+      window.setTimeout(() => setTarakSaveFeedback(null), 4000);
+    } catch {
+      setTarakSaveFeedback(language === 'mr' ? 'फाईल सेव्ह करता आली नाही.' : 'Could not save file.');
+      window.setTimeout(() => setTarakSaveFeedback(null), 3500);
+    } finally {
+      if (tarakFileInputRef.current) tarakFileInputRef.current.value = '';
+    }
+  };
 
   const handleToggleTarakSong = () => {
     if (!tarakIframeRef.current || !tarakIframeRef.current.contentWindow) return;
@@ -125,6 +193,7 @@ export const NityaSevaView: React.FC = () => {
         {[
           { id: 'japa', label: t('japaTab') },
           { id: 'tarak_mantra', label: t('tarakMantraTab') },
+          { id: 'bhajan_videos', label: t('swamiVideosTab') },
           { id: 'aarti', label: t('aartiTab') },
           { id: 'agnihotra', label: t('agnihotraTab') },
           { id: 'atharvashirsha', label: t('atharvashirshaTab') },
@@ -144,7 +213,9 @@ export const NityaSevaView: React.FC = () => {
       </div>
 
       {/* Main Tab Content */}
-      {activeTab === 'japa' ? (
+      {activeTab === 'bhajan_videos' ? (
+        <SwamiVideosView onOpenOfflineVault={onOpenOfflineVault} />
+      ) : activeTab === 'japa' ? (
         <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 shadow-xs border border-orange-100 text-center space-y-4 sm:space-y-5">
           {/* Header with Sacred Swami Samarth Darshan Medallion */}
           <div className="space-y-2">
@@ -403,95 +474,218 @@ export const NityaSevaView: React.FC = () => {
             </p>
           </div>
 
-          {/* Dedicated Tarak Mantra Song & Audio Player (Suvarna Bhakti YouTube Embed with Play/Pause) */}
-          {activeTab === 'tarak_mantra' && (
-            <div className="rounded-2xl bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 p-3.5 sm:p-4 text-white shadow-md border border-amber-300 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-10 h-10 rounded-xl p-0.5 bg-amber-200 ring-2 ring-white/70 overflow-hidden shrink-0 shadow-xs">
-                    <img
-                      src="/pwa-192x192.png"
-                      alt="श्री स्वामी समर्थ"
-                      className="w-full h-full object-cover rounded-lg"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <Music className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-                      <span className="text-[10px] font-black uppercase text-amber-200 tracking-wider">
-                        {language === 'mr' ? 'तारक मंत्र ऑडिओ व गायन' : 'Tarak Mantra Song'}
-                      </span>
+          {/* Dedicated Tarak Mantra Song & Offline Vault Audio Player */}
+          {activeTab === 'tarak_mantra' && (() => {
+            const hasOffline = Boolean(tarakOfflineRecord);
+            const useOffline = hasOffline && (!network.isOnline || !preferTarakYouTube);
+            const showDataSaverFacade =
+              !useOffline && network.isOnline && network.isDataSaverActive && !tarakYouTubeLoaded;
+            const showOfflineEmpty = !useOffline && !network.isOnline;
+
+            return (
+              <div className="rounded-2xl bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 p-3.5 sm:p-4 text-white shadow-md border border-amber-300 space-y-3">
+                <input
+                  ref={tarakFileInputRef}
+                  type="file"
+                  accept="audio/*,video/mp4,video/webm,.mp3,.m4a,.wav,.ogg,.aac,.mp4,.webm"
+                  onChange={handleSaveTarakOffline}
+                  className="hidden"
+                />
+
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl p-0.5 bg-amber-200 ring-2 ring-white/70 overflow-hidden shrink-0 shadow-xs">
+                      <img
+                        src="/pwa-192x192.png"
+                        alt="श्री स्वामी समर्थ"
+                        className="w-full h-full object-cover rounded-lg"
+                      />
                     </div>
-                    <h3 className="text-sm sm:text-base font-black text-white truncate">
-                      संपूर्ण तारक मंत्र - Suvarna Bhakti
-                    </h3>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <Music className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+                        <span className="text-[10px] font-black uppercase text-amber-200 tracking-wider">
+                          {language === 'mr' ? 'तारक मंत्र ऑडिओ व गायन' : 'Tarak Mantra Song'}
+                        </span>
+                      </div>
+                      <h3 className="text-sm sm:text-base font-black text-white truncate">
+                        संपूर्ण तारक मंत्र - Suvarna Bhakti
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {hasOffline && network.isOnline && (
+                      <div className="flex items-center bg-black/25 rounded-xl p-0.5 border border-amber-300/30">
+                        <button
+                          type="button"
+                          onClick={() => setPreferTarakYouTube(false)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition ${
+                            !preferTarakYouTube
+                              ? 'bg-amber-300 text-orange-950'
+                              : 'text-amber-100 hover:text-white'
+                          }`}
+                        >
+                          {t('switchToOfflineAudio')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreferTarakYouTube(true)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition ${
+                            preferTarakYouTube
+                              ? 'bg-amber-300 text-orange-950'
+                              : 'text-amber-100 hover:text-white'
+                          }`}
+                        >
+                          {t('switchToYouTubeStream')}
+                        </button>
+                      </div>
+                    )}
+
+                    <a
+                      href="https://youtube.com/shorts/9f5E0fBuJdU?si=Bqtwv-c9xciZETKI"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold flex items-center gap-1 shrink-0 transition whitespace-nowrap"
+                      title={language === 'mr' ? 'YouTube वर उघडा' : 'Open in YouTube'}
+                    >
+                      <span className="hidden sm:inline">YouTube</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
                 </div>
 
-                <a
-                  href="https://youtube.com/shorts/9f5E0fBuJdU?si=Bqtwv-c9xciZETKI"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2.5 py-1 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold flex items-center gap-1 shrink-0 transition"
-                  title={language === 'mr' ? 'YouTube वर उघडा' : 'Open in YouTube'}
-                >
-                  <span>YouTube</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
+                {useOffline && tarakOfflineRecord ? (
+                  <OfflineMediaPlayer
+                    record={tarakOfflineRecord}
+                    posterUrl="/assets/aistudio/img_2912_1024_edcd846d.jpg"
+                    playLabel={t('tarakMantraPlay')}
+                    pauseLabel={t('tarakMantraPause')}
+                  />
+                ) : showOfflineEmpty ? (
+                  <div className="rounded-2xl bg-black/30 border border-amber-300/40 p-4 text-center space-y-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center mx-auto">
+                      <WifiOff className="w-5 h-5 text-amber-200" />
+                    </div>
+                    <p className="text-xs text-amber-100 leading-relaxed max-w-sm mx-auto">
+                      {t('offlineNoFileNotice')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => tarakFileInputRef.current?.click()}
+                      className="min-h-[42px] px-4 py-2 rounded-xl bg-gradient-to-r from-amber-300 to-yellow-300 text-orange-950 font-black text-xs inline-flex items-center gap-1.5 shadow-sm transition active:scale-95 whitespace-nowrap"
+                    >
+                      <Upload className="w-4 h-4 shrink-0" />
+                      <span>{t('saveOfflineFileBtn')}</span>
+                    </button>
+                  </div>
+                ) : showDataSaverFacade ? (
+                  <div className="rounded-2xl bg-black/35 border border-amber-300/50 p-4 text-center space-y-2.5">
+                    <p className="text-[11px] font-bold text-amber-200 flex items-center justify-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5 shrink-0" />
+                      <span>{t('dataSaverActiveNotice')}</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setTarakYouTubeLoaded(true)}
+                      className="min-h-[44px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-300 to-yellow-300 hover:from-amber-200 hover:to-yellow-200 text-orange-950 font-black text-xs sm:text-sm inline-flex items-center gap-2 shadow-md transition active:scale-95 whitespace-nowrap"
+                    >
+                      <Play className="w-4 h-4 fill-current shrink-0" />
+                      <span>{t('dataSaverTapToLoad')}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* YouTube Shorts Embed Player */}
+                    <div className="relative rounded-2xl overflow-hidden bg-black/80 aspect-video sm:aspect-[16/9] max-h-64 sm:max-h-72 w-full mx-auto border-2 border-amber-300/80 shadow-md">
+                      <iframe
+                        ref={tarakIframeRef}
+                        src="https://www.youtube-nocookie.com/embed/9f5E0fBuJdU?enablejsapi=1&playsinline=1&rel=0&modestbranding=1"
+                        title="संपूर्ण तारक मंत्र श्री स्वामी समर्थ"
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
 
-              {/* YouTube Shorts Embed Player */}
-              <div className="relative rounded-2xl overflow-hidden bg-black/80 aspect-video sm:aspect-[16/9] max-h-64 sm:max-h-72 w-full mx-auto border-2 border-amber-300/80 shadow-md">
-                <iframe
-                  ref={tarakIframeRef}
-                  src="https://www.youtube-nocookie.com/embed/9f5E0fBuJdU?enablejsapi=1&playsinline=1&rel=0&modestbranding=1"
-                  title="संपूर्ण तारक मंत्र श्री स्वामी समर्थ"
-                  className="w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
+                    {/* Play / Pause Toggle Button Bar */}
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleToggleTarakSong}
+                        className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-95 cursor-pointer whitespace-nowrap ${
+                          isPlayingTarak
+                            ? 'bg-amber-100 hover:bg-white text-orange-950'
+                            : 'bg-gradient-to-r from-amber-300 to-yellow-300 hover:from-amber-200 hover:to-yellow-200 text-orange-950'
+                        }`}
+                      >
+                        {isPlayingTarak ? (
+                          <>
+                            <Pause className="w-4 h-4 fill-current text-orange-900" />
+                            <span>{t('tarakMantraPause')}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-4 h-4 fill-current text-orange-900" />
+                            <span>{t('tarakMantraPlay')}</span>
+                          </>
+                        )}
+                      </button>
 
-              {/* Play / Pause Toggle Button Bar */}
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={handleToggleTarakSong}
-                  className={`flex-1 py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-95 cursor-pointer ${
-                    isPlayingTarak
-                      ? 'bg-amber-100 hover:bg-white text-orange-950'
-                      : 'bg-gradient-to-r from-amber-300 to-yellow-300 hover:from-amber-200 hover:to-yellow-200 text-orange-950'
-                  }`}
-                >
-                  {isPlayingTarak ? (
-                    <>
-                      <Pause className="w-4 h-4 fill-current text-orange-900" />
-                      <span>{t('tarakMantraPause')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 fill-current text-orange-900" />
-                      <span>{t('tarakMantraPlay')}</span>
-                    </>
+                      <button
+                        type="button"
+                        onClick={() => templeSound.playBell(780, 0.6)}
+                        className="min-h-[44px] py-2.5 px-3 rounded-xl bg-black/25 hover:bg-black/35 text-amber-200 text-xs font-bold flex items-center gap-1.5 transition border border-amber-300/30 whitespace-nowrap"
+                        title="घंटानाद वाजवा"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">घंटानाद</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Quick Offline Vault Save Strip */}
+                <div className="flex items-center justify-between gap-2 pt-0.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => tarakFileInputRef.current?.click()}
+                    className="min-h-[36px] px-3 py-1.5 rounded-xl bg-black/25 hover:bg-black/35 border border-amber-300/35 text-amber-100 text-[11px] font-bold flex items-center gap-1.5 transition whitespace-nowrap"
+                  >
+                    <Upload className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      {hasOffline
+                        ? language === 'mr'
+                          ? 'ऑफलाईन फाईल बदला'
+                          : 'Replace Offline File'
+                        : t('saveOfflineFileBtn')}
+                    </span>
+                  </button>
+
+                  {onOpenOfflineVault && (
+                    <button
+                      type="button"
+                      onClick={onOpenOfflineVault}
+                      className="min-h-[36px] px-3 py-1.5 rounded-xl bg-black/20 hover:bg-black/35 border border-amber-300/25 text-amber-100 text-[11px] font-bold flex items-center gap-1.5 transition whitespace-nowrap"
+                    >
+                      <HardDrive className="w-3.5 h-3.5 shrink-0" />
+                      <span>{t('openOfflineVaultBtn')}</span>
+                    </button>
                   )}
-                </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => templeSound.playBell(780, 0.6)}
-                  className="py-2.5 px-3 rounded-xl bg-black/25 hover:bg-black/35 text-amber-200 text-xs font-bold flex items-center gap-1.5 transition border border-amber-300/30"
-                  title="घंटानाद वाजवा"
-                >
-                  <Volume2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">घंटानाद</span>
-                </button>
+                {tarakSaveFeedback && (
+                  <p className="text-xs font-bold text-amber-100 bg-black/25 px-3 py-1.5 rounded-xl border border-amber-300/30">
+                    {tarakSaveFeedback}
+                  </p>
+                )}
+
+                <p className="text-[11px] text-amber-100/90 text-center leading-snug">
+                  {t('tarakMantraAudioDesc')}
+                </p>
               </div>
-
-              <p className="text-[11px] text-amber-100/90 text-center leading-snug">
-                {t('tarakMantraAudioDesc')}
-              </p>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Devotional Verse Text Box */}
           <div className="rounded-2xl bg-amber-50/50 p-4 sm:p-6 border border-amber-200/60 shadow-2xs">

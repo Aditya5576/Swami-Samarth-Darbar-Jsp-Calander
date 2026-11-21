@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
-import { Search, Calendar as CalendarIcon, Bell, MapPin } from 'lucide-react';
+import { Search, Calendar as CalendarIcon, Bell, MapPin, ShieldCheck, WifiOff } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { getNotificationSettings } from '../utils/notificationService';
 
 interface HeaderProps {
@@ -9,6 +10,7 @@ interface HeaderProps {
   onOpenSearch: () => void;
   onGoToToday: () => void;
   onOpenNotifications: () => void;
+  onOpenOfflineVault?: () => void;
   onOpenSplash?: () => void;
 }
 
@@ -17,9 +19,11 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSearch,
   onGoToToday,
   onOpenNotifications,
+  onOpenOfflineVault,
   onOpenSplash,
 }) => {
   const { language, setLanguage, t } = useLanguage();
+  const network = useNetworkStatus();
   const [notifActive, setNotifActive] = useState(true);
 
   useEffect(() => {
@@ -109,6 +113,27 @@ export const Header: React.FC<HeaderProps> = ({
               EN
             </button>
           </div>
+
+          {/* Offline Seva & Audio Vault Button */}
+          {onOpenOfflineVault && (
+            <button
+              type="button"
+              onClick={onOpenOfflineVault}
+              aria-label={t('offlineVaultTitle')}
+              title={t('offlineVaultTitle')}
+              className={`relative p-1.5 sm:p-2 rounded-xl border active:scale-90 transition shadow-xs ${
+                !network.isOnline
+                  ? 'bg-amber-300 text-orange-950 border-amber-100'
+                  : 'bg-orange-900/50 hover:bg-orange-900/80 text-amber-200 hover:text-white border-amber-400/30'
+              }`}
+            >
+              {!network.isOnline ? (
+                <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              ) : (
+                <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              )}
+            </button>
+          )}
 
           {/* Daily 6 AM Notification Bell */}
           <button

@@ -7,11 +7,13 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { CalendarView } from './components/CalendarView';
 import { FestivalsView } from './components/FestivalsView';
+import { SaramrutView } from './components/SaramrutView';
 import { NityaSevaView } from './components/NityaSevaView';
 import { MuhuratAndSevaMargView } from './components/MuhuratAndSevaMargView';
 import { DayDetailsModal } from './components/DayDetailsModal';
 import { SearchModal } from './components/SearchModal';
 import { NotificationModal } from './components/NotificationModal';
+import { OfflineVaultModal } from './components/OfflineVaultModal';
 import { BottomNav, MainTabType } from './components/BottomNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
@@ -36,6 +38,7 @@ function AppContent() {
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isOfflineVaultOpen, setIsOfflineVaultOpen] = useState(false);
 
   // Initialize daily notification background checker (runs at 6:00 AM)
   useEffect(() => {
@@ -86,6 +89,7 @@ function AppContent() {
         onOpenSearch={() => setIsSearchOpen(true)}
         onGoToToday={handleGoToToday}
         onOpenNotifications={() => setIsNotificationOpen(true)}
+        onOpenOfflineVault={() => setIsOfflineVaultOpen(true)}
         onOpenSplash={() => setShowSplash(true)}
       />
 
@@ -149,10 +153,15 @@ function AppContent() {
           />
         )}
 
-        {/* Tab 3: Nitya Seva & Japa Mala */}
-        {activeTab === 'nitya_seva' && <NityaSevaView />}
+        {/* Tab 3: Shree Swami Samarth Charitra Saramrut (21 Adhyays Offline Reader) */}
+        {activeTab === 'saramrut' && <SaramrutView />}
 
-        {/* Tab 4: Muhurat & Jaysingpur Seva Kendra Info */}
+        {/* Tab 4: Nitya Seva & Japa Mala */}
+        {activeTab === 'nitya_seva' && (
+          <NityaSevaView onOpenOfflineVault={() => setIsOfflineVaultOpen(true)} />
+        )}
+
+        {/* Tab 5: Muhurat & Jaysingpur Seva Kendra Info */}
         {activeTab === 'muhurat_info' && <MuhuratAndSevaMargView />}
 
         {/* Clean, Devotional Spiritual Footer */}
@@ -200,8 +209,14 @@ function AppContent() {
         onClose={() => setIsNotificationOpen(false)}
       />
 
-      {/* Offline Toast Indicator */}
-      <OfflineIndicator />
+      {/* Offline Seva & Audio Vault Modal */}
+      <OfflineVaultModal
+        isOpen={isOfflineVaultOpen}
+        onClose={() => setIsOfflineVaultOpen(false)}
+      />
+
+      {/* Calm Offline & 2G/3G Data-Saver Indicator */}
+      <OfflineIndicator onOpenOfflineVault={() => setIsOfflineVaultOpen(true)} />
 
       {/* Devotional Splash Screen featuring Jaysingpur Murti Photo */}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}

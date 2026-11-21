@@ -7,10 +7,11 @@ import { registerSW } from 'virtual:pwa-register';
 registerSW({
   immediate: true,
   onNeedRefresh() {
-    // Service worker updated
+    window.dispatchEvent(new CustomEvent('swami-sw-update-available'));
   },
   onOfflineReady() {
-    // App is ready to work offline
+    (window as unknown as { __SWAMI_SW_OFFLINE_READY__?: boolean }).__SWAMI_SW_OFFLINE_READY__ = true;
+    window.dispatchEvent(new CustomEvent('swami-sw-offline-ready'));
   },
 });
 

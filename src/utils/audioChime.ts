@@ -55,14 +55,14 @@ class TempleSoundManager {
 
       let arrayBuffer: ArrayBuffer | null = null;
 
-      // 1. Try fetching from public/audio/swami_samarth_chant.mp3
+      // 1. Try cached/local public/audio/swami_samarth_chant.mp3 (never block offline)
       try {
-        const resp = await fetch('/audio/swami_samarth_chant.mp3?v=11', { cache: 'no-cache' });
+        const resp = await fetch('/audio/swami_samarth_chant.mp3', { cache: 'force-cache' });
         if (resp.ok) {
           arrayBuffer = await resp.arrayBuffer();
         }
       } catch {
-        // Fallback to base64 below
+        // Fallback to embedded base64 below
       }
 
       // 2. If fetch failed or running offline, decode from embedded base64 data URI
