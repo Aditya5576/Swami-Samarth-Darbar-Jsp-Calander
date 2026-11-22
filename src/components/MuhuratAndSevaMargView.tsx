@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SHUBH_MUHURATS_2026, SEVA_DEPARTMENTS, GURUPITH_INFO } from '../data/calendar2026Data';
 import { useLanguage } from '../context/LanguageContext';
+import { TempleGalleryView } from './TempleGalleryView';
 import {
   Sparkles,
   Home,
@@ -29,7 +30,7 @@ import {
 
 export const MuhuratAndSevaMargView: React.FC = () => {
   const { language, t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'gurupith' | 'muhurat' | 'departments'>('gurupith');
+  const [activeTab, setActiveTab] = useState<'gurupith' | 'gallery' | 'muhurat' | 'departments'>('gurupith');
   const [addressCopied, setAddressCopied] = useState(false);
   const [showFullDarshan, setShowFullDarshan] = useState(false);
 
@@ -43,41 +44,31 @@ export const MuhuratAndSevaMargView: React.FC = () => {
 
   return (
     <div className="space-y-4 max-w-full">
-      {/* Sub Tabs */}
-      <div className="rounded-2xl bg-white p-1.5 shadow-xs border border-orange-100 flex gap-1">
-        <button
-          onClick={() => setActiveTab('gurupith')}
-          className={`flex-1 py-2 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all active:scale-95 text-center truncate ${
-            activeTab === 'gurupith'
-              ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-xs'
-              : 'bg-orange-50/70 hover:bg-orange-100 text-orange-950 border border-orange-200/50'
-          }`}
-        >
-          {t('gurupithSubTab')}
-        </button>
-
-        <button
-          onClick={() => setActiveTab('muhurat')}
-          className={`flex-1 py-2 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all active:scale-95 text-center truncate ${
-            activeTab === 'muhurat'
-              ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-xs'
-              : 'bg-orange-50/70 hover:bg-orange-100 text-orange-950 border border-orange-200/50'
-          }`}
-        >
-          {t('muhuratSubTab')}
-        </button>
-
-        <button
-          onClick={() => setActiveTab('departments')}
-          className={`flex-1 py-2 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all active:scale-95 text-center truncate ${
-            activeTab === 'departments'
-              ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-xs'
-              : 'bg-orange-50/70 hover:bg-orange-100 text-orange-950 border border-orange-200/50'
-          }`}
-        >
-          {t('deptSubTab')}
-        </button>
+      {/* Sub Tabs - Clean horizontally scrollable bar matching Daily Seva */}
+      <div className="rounded-2xl bg-white p-1.5 sm:p-2 shadow-xs border border-orange-100 flex overflow-x-auto gap-1.5 scrollbar-none">
+        {[
+          { id: 'gurupith' as const, label: t('gurupithSubTab') },
+          { id: 'gallery' as const, label: t('gallerySubTab') },
+          { id: 'muhurat' as const, label: t('muhuratSubTab') },
+          { id: 'departments' as const, label: t('deptSubTab') },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`min-h-[38px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all active:scale-95 shrink-0 ${
+              activeTab === tab.id
+                ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-xs'
+                : 'bg-orange-50/70 hover:bg-orange-100 text-orange-950 border border-orange-200/50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {/* Temple Darshan Photo Gallery Tab */}
+      {activeTab === 'gallery' && <TempleGalleryView />}
 
       {/* 1. Official Jaysingpur Seva Darbar Info Tab */}
       {activeTab === 'gurupith' && (

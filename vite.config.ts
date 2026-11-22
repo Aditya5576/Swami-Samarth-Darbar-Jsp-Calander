@@ -87,6 +87,35 @@ export default defineConfig(() => {
               },
             },
             {
+              urlPattern: /\/api\/gallery\/temple-photos/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'swami-gallery-feed-cache',
+                networkTimeoutSeconds: 3,
+                expiration: {
+                  maxEntries: 5,
+                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/lh3\.googleusercontent\.com\/pw\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'swami-temple-photos-cache',
+                expiration: {
+                  maxEntries: 120,
+                  maxAgeSeconds: 60 * 60 * 24 * 60, // 60 days
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
               options: {
@@ -128,7 +157,8 @@ export default defineConfig(() => {
       },
     },
     server: {
-      hmr: process.env.DISABLE_HMR !== 'true',
+      hmr: false,
+      ws: false as const,
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

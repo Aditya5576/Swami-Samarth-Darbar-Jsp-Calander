@@ -1,7 +1,8 @@
 {
-  "name": "react-example",
+  "name": "swami-samarth-seva-darbar-jaysingpur",
+  "description": "Offline-first devotional PWA for Shree Swami Samarth Seva Darbar, Jaysingpur featuring Marathi/English Panchang calendar, Rahu Kaal, complete 21-Adhyay Charitra Saramrut, 108 Japa Mala, Tarak Mantra, Swaamirajmaaulii bhajans, 2G/3G Data-Saver, and on-device Offline Audio Vault.",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",

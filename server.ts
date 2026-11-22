@@ -21,6 +21,35 @@ const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const REFRESH_COOLDOWN_MS = 3 * 1000; // 3 seconds
 
+// Fixed, allowlisted official Google Photos shared album for Jaysingpur Seva Darbar
+const TEMPLE_ALBUM_SHARE_URL = 'https://photos.app.goo.gl/Wi3gkoXLGPUSQeeX7';
+const TEMPLE_ALBUM_TITLE = 'Swami Samarth Darbar';
+const GOOGLE_PHOTO_URL_REGEX = /https:\/\/lh3\.googleusercontent\.com\/pw\/[A-Za-z0-9_-]{20,}/g;
+const GALLERY_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+interface TemplePhotoItem {
+  id: string;
+  baseUrl: string;
+  index: number;
+}
+
+const SEED_TEMPLE_PHOTOS: TemplePhotoItem[] = [
+  'https://lh3.googleusercontent.com/pw/AP1GczPx3-YcCgJH8oFM8BOdnFAeAGk5QgmOaQZ6e-EsspkA9XkcC7jedv5EVCveBeWg7j4ZW4QmKTH2tq_76rzsvrAbviQhGFPVhB-OA4m_nJbpMc3hzYo',
+  'https://lh3.googleusercontent.com/pw/AP1GczO4llDimcN7-2am-8kvxlfbgnAWHgBGBbo2XhHHTm2rwvlzISCC8TX5h2wjAM4i9MtUsOwX8eJhZnqbC4WO_es3HlNPzPlDbI1Lv-7Kcr4Fl4Lu5OM',
+  'https://lh3.googleusercontent.com/pw/AP1GczPpsyWHA8fJLY5wUB-B_T7Ih0EmREN5Shs9nqsIykVAwACczYjSu46tZ5oxQlCxu5o0VENVU_Kb3SJZI9UfOUyzbvLNX6kFr9icrn_w1I18KNsLjWQ',
+  'https://lh3.googleusercontent.com/pw/AP1GczMtYOaizJ1zWvgG5AhM-tKOU6qNn-dd8cS9eDHuNhY8V0Eb7rK-2dXTb9CzjiXA2WC_Wv1PjXYp3miKHsnKoE4PzJ7IJG7il_jLIPuq0usc3myIHeU',
+  'https://lh3.googleusercontent.com/pw/AP1GczMbn0F596teJjT-pEUs_VamGy3JAEtMcg3Mlp7EMylRvZGx1loK4xFSSsAEFQaUrx9ELg-THslvWmA1sXZPXA1XqOnIOjrzO-JexlbfdJyK8dC9WkE',
+  'https://lh3.googleusercontent.com/pw/AP1GczMDba03_lrODdZxAIuMYo8ZvK1fAPUPCxLlHbvUpoN_138umLI-7N-4eegjMSp9FNdHOM_qcpwFlzGL1aLDvg2Hh-KV_OUSY0p_ibMvJW31UJIEaEM',
+].map((baseUrl, idx) => ({
+  id: `seed-${idx + 1}`,
+  baseUrl,
+  index: idx + 1,
+}));
+
+let cachedGalleryPhotos: TemplePhotoItem[] | null = null;
+let cachedGalleryTitle = TEMPLE_ALBUM_TITLE;
+let cachedGalleryAtMs = 0;
+
 interface ChannelVideo {
   videoId: string;
   title: string;
@@ -159,6 +188,52 @@ async function fetchLiveChannelVideos(): Promise<ChannelVideo[]> {
   }
 }
 
+async function fetchLiveTempleAlbumPhotos(): Promise<{ title: string; photos: TemplePhotoItem[] }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 9000);
+
+  try {
+    const response = await fetch(TEMPLE_ALBUM_SHARE_URL, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Photos album HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/);
+    const rawTitle = titleMatch?.[1] ? decodeXmlEntities(titleMatch[1]) : TEMPLE_ALBUM_TITLE;
+
+    const rawMatches = html.match(GOOGLE_PHOTO_URL_REGEX) || [];
+    const seen = new Set<string>();
+    const photos: TemplePhotoItem[] = [];
+
+    for (const url of rawMatches) {
+      if (seen.has(url)) continue;
+      seen.add(url);
+      photos.push({
+        id: `gp-${photos.length + 1}`,
+        baseUrl: url,
+        index: photos.length + 1,
+      });
+    }
+
+    if (photos.length === 0) {
+      throw new Error('No photos found in shared album');
+    }
+
+    return { title: rawTitle, photos };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function startServer() {
   const app = express();
   app.disable('x-powered-by');
@@ -220,10 +295,200 @@ async function startServer() {
     }
   });
 
+  // Allowlisted Google Photos shared album proxy for Jaysingpur Seva Darbar Gallery
+  app.get('/api/gallery/temple-photos', async (req: Request, res: Response) => {
+    const forceRefresh = req.query.refresh === '1';
+    const now = Date.now();
+    const cacheAge = now - cachedGalleryAtMs;
+
+    const canUseCache =
+      cachedGalleryPhotos !== null &&
+      ((!forceRefresh && cacheAge < GALLERY_CACHE_TTL_MS) ||
+        (forceRefresh && cacheAge < REFRESH_COOLDOWN_MS));
+
+    if (canUseCache && cachedGalleryPhotos) {
+      res.setHeader('Cache-Control', 'public, max-age=120');
+      res.json({
+        album: {
+          title: cachedGalleryTitle,
+          shareUrl: TEMPLE_ALBUM_SHARE_URL,
+        },
+        photos: cachedGalleryPhotos,
+        totalCount: cachedGalleryPhotos.length,
+        fetchedAt: new Date(cachedGalleryAtMs).toISOString(),
+        source: 'cache',
+      });
+      return;
+    }
+
+    try {
+      const live = await fetchLiveTempleAlbumPhotos();
+      cachedGalleryPhotos = live.photos;
+      cachedGalleryTitle = live.title;
+      cachedGalleryAtMs = Date.now();
+
+      res.setHeader('Cache-Control', 'no-cache');
+      res.json({
+        album: {
+          title: live.title,
+          shareUrl: TEMPLE_ALBUM_SHARE_URL,
+        },
+        photos: live.photos,
+        totalCount: live.photos.length,
+        fetchedAt: new Date(cachedGalleryAtMs).toISOString(),
+        source: 'live',
+      });
+    } catch {
+      const fallbackPhotos =
+        cachedGalleryPhotos && cachedGalleryPhotos.length > 0
+          ? cachedGalleryPhotos
+          : SEED_TEMPLE_PHOTOS;
+      res.setHeader('Cache-Control', 'no-cache');
+      res.json({
+        album: {
+          title: cachedGalleryTitle,
+          shareUrl: TEMPLE_ALBUM_SHARE_URL,
+        },
+        photos: fallbackPhotos,
+        totalCount: fallbackPhotos.length,
+        fetchedAt: new Date(cachedGalleryAtMs || now).toISOString(),
+        source: cachedGalleryPhotos ? 'cache' : 'fallback',
+      });
+    }
+  });
+
+  // Read-only, allowlisted high-res photo download proxy for Sevaks (no SSRF, lookup by index only)
+  app.get('/api/gallery/download', async (req: Request, res: Response) => {
+    const rawIdx = Number(req.query.index);
+    if (!Number.isInteger(rawIdx) || rawIdx < 1 || rawIdx > 1000) {
+      res.status(400).json({ error: 'Invalid photo index' });
+      return;
+    }
+
+    let pool = cachedGalleryPhotos;
+    if (!pool || pool.length === 0) {
+      try {
+        const live = await fetchLiveTempleAlbumPhotos();
+        cachedGalleryPhotos = live.photos;
+        cachedGalleryTitle = live.title;
+        cachedGalleryAtMs = Date.now();
+        pool = live.photos;
+      } catch {
+        pool = SEED_TEMPLE_PHOTOS;
+      }
+    }
+
+    const photo = pool[rawIdx - 1];
+    if (!photo || !/^https:\/\/lh3\.googleusercontent\.com\/pw\/[A-Za-z0-9_-]{20,}$/.test(photo.baseUrl)) {
+      res.status(404).json({ error: 'Photo not found in album' });
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const upstream = await fetch(`${photo.baseUrl}=w1800`, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36',
+          Accept: 'image/*',
+        },
+      });
+
+      if (!upstream.ok) {
+        res.status(502).json({ error: 'Unable to fetch photo for download' });
+        return;
+      }
+
+      const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+      if (!contentType.toLowerCase().startsWith('image/')) {
+        res.status(502).json({ error: 'Unexpected response format' });
+        return;
+      }
+
+      const ext = contentType.includes('png')
+        ? 'png'
+        : contentType.includes('webp')
+        ? 'webp'
+        : 'jpg';
+      const arrayBuf = await upstream.arrayBuffer();
+      const buffer = Buffer.from(arrayBuf);
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="swami-samarth-darbar-darshan-${rawIdx}.${ext}"`
+      );
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Content-Length', String(buffer.length));
+      res.send(buffer);
+    } catch {
+      res.status(504).json({ error: 'Download timed out' });
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+
   if (!IS_PROD) {
+    // Serve a clean no-WebSocket /@vite/client shim in dev so proxied previews never
+    // trigger "[vite] Error: WebSocket closed without opened." while preserving CSS injection.
+    app.get('/@vite/client', (_req: Request, res: Response) => {
+      res.type('application/javascript; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.send(`
+const sheetsMap = new Map();
+export function updateStyle(id, content) {
+  let style = sheetsMap.get(id);
+  if (!style) {
+    style = document.createElement('style');
+    style.setAttribute('type', 'text/css');
+    style.setAttribute('data-vite-dev-id', id);
+    style.textContent = content;
+    document.head.appendChild(style);
+    sheetsMap.set(id, style);
+  } else {
+    style.textContent = content;
+  }
+}
+export function removeStyle(id) {
+  const style = sheetsMap.get(id);
+  if (style) {
+    document.head.removeChild(style);
+    sheetsMap.delete(id);
+  }
+}
+export function injectQuery(url, queryToInject) {
+  if (typeof url !== 'string' || (!url.startsWith('.') && !url.startsWith('/'))) return url;
+  const pathname = url.replace(/[?#].*$/, '');
+  const { search, hash } = new URL(url, 'http://vite.dev');
+  return pathname + '?' + queryToInject + (search ? '&' + search.slice(1) : '') + (hash || '');
+}
+export function createHotContext() {
+  return {
+    data: {},
+    accept() {},
+    acceptExports() {},
+    dispose() {},
+    prune() {},
+    decline() {},
+    invalidate() {},
+    on() {},
+    off() {},
+    send() {},
+  };
+}
+export class ErrorOverlay extends HTMLElement {}
+`);
+    });
+
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        ws: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
