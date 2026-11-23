@@ -56,7 +56,7 @@ export const MuhuratAndSevaMargView: React.FC = () => {
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`min-h-[38px] px-3 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all active:scale-95 shrink-0 ${
+            className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all active:scale-95 shrink-0 ${
               activeTab === tab.id
                 ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-xs'
                 : 'bg-orange-50/70 hover:bg-orange-100 text-orange-950 border border-orange-200/50'
@@ -78,14 +78,14 @@ export const MuhuratAndSevaMargView: React.FC = () => {
             {/* Direct Murti Darshan Showcase - Dignified Portrait Framing */}
             <div className="space-y-3">
               {/* Header Label */}
-              <div className="flex items-center justify-between pb-1.5 border-b border-orange-200/70">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-orange-600" />
-                  <span className="font-black text-xs sm:text-sm text-orange-950 uppercase tracking-wide">
+              <div className="flex items-center justify-between flex-nowrap gap-2 pb-1.5 border-b border-orange-200/70">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <Sparkles className="w-4 h-4 text-orange-600 shrink-0" />
+                  <span className="font-black text-xs sm:text-sm text-orange-950 uppercase tracking-wide truncate whitespace-nowrap">
                     {language === 'mr' ? 'प्रत्यक्ष मूर्ती दर्शन' : 'Direct Murti Darshan'}
                   </span>
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-900 text-[10px] font-black border border-orange-300">
+                <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-900 text-[10px] font-black border border-orange-300 whitespace-nowrap shrink-0">
                   {language === 'mr' ? 'जयसिंगपूर दरबार' : 'Jaysingpur Darbar'}
                 </span>
               </div>
@@ -239,21 +239,21 @@ export const MuhuratAndSevaMargView: React.FC = () => {
 
             {/* Daily Online Seva & Pournima Palki Google Meet Card */}
             <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-900/15 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+              <div className="flex items-center justify-between flex-nowrap gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
                     <Video className="w-4 h-4 text-white" />
                   </span>
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-black text-white leading-tight">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-sm font-black text-white leading-tight truncate">
                       {t('onlineSevaTitle')}
                     </h4>
-                    <p className="text-[10px] text-blue-100 font-medium">
+                    <p className="text-[10px] text-blue-100 font-medium truncate">
                       {t('onlineSevaDesc')}
                     </p>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase shrink-0 whitespace-nowrap">
                   LIVE
                 </span>
               </div>
@@ -261,11 +261,11 @@ export const MuhuratAndSevaMargView: React.FC = () => {
                 href={GURUPITH_INFO.onlineSevaMeetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2 px-3 rounded-xl bg-white text-blue-900 hover:bg-blue-50 font-extrabold text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+                className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-white text-blue-900 hover:bg-blue-50 font-extrabold text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap"
               >
-                <Video className="w-3.5 h-3.5 text-blue-700" />
-                <span>{t('joinOnlineMeet')}</span>
-                <ExternalLink className="w-3 h-3 text-blue-700" />
+                <Video className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                <span className="truncate">{t('joinOnlineMeet')}</span>
+                <ExternalLink className="w-3 h-3 text-blue-700 shrink-0" />
               </a>
             </div>
 
@@ -275,26 +275,27 @@ export const MuhuratAndSevaMargView: React.FC = () => {
                 href={GURUPITH_INFO.mapShareUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-extrabold text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+                className="w-full min-h-[44px] py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-extrabold text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap"
               >
                 <MapPin className="w-4 h-4 shrink-0" />
-                <span>{language === 'mr' ? 'गूगल मॅपवर मंदिर स्थान व मार्ग' : 'Open Temple on Google Maps'}</span>
+                <span className="truncate">{language === 'mr' ? 'गूगल मॅपवर मंदिर स्थान व मार्ग' : 'Open Temple on Google Maps'}</span>
                 <ExternalLink className="w-3.5 h-3.5 shrink-0" />
               </a>
 
               <button
+                type="button"
                 onClick={handleCopyAddress}
-                className="w-full py-2.5 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-950 font-bold text-xs border border-orange-200/90 shadow-2xs flex items-center justify-center gap-1.5 transition active:scale-95"
+                className="w-full min-h-[44px] py-2.5 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-950 font-bold text-xs border border-orange-200/90 shadow-2xs flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap"
               >
                 {addressCopied ? (
                   <>
                     <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="text-emerald-700 font-extrabold">{t('addressCopied')}</span>
+                    <span className="text-emerald-700 font-extrabold truncate">{t('addressCopied')}</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-4 h-4 text-orange-700 shrink-0" />
-                    <span>{t('copyAddress')}</span>
+                    <span className="truncate">{t('copyAddress')}</span>
                   </>
                 )}
               </button>
@@ -327,9 +328,9 @@ export const MuhuratAndSevaMargView: React.FC = () => {
             </h4>
             <div className="grid grid-cols-2 gap-2 text-slate-700 font-medium">
               {GURUPITH_INFO.aartiTimings.map((a, i) => (
-                <div key={i} className="p-2 rounded-xl bg-orange-50/70 border border-orange-100">
-                  <strong className="text-orange-950 block text-[11px]">{a.name}</strong>
-                  <span className="text-slate-800 font-bold">{a.time}</span>
+                <div key={i} className="p-2 rounded-xl bg-orange-50/70 border border-orange-100 min-w-0">
+                  <strong className="text-orange-950 block text-[11px] truncate whitespace-nowrap">{a.name}</strong>
+                  <span className="text-slate-800 font-bold block truncate whitespace-nowrap">{a.time}</span>
                 </div>
               ))}
             </div>
@@ -377,14 +378,14 @@ export const MuhuratAndSevaMargView: React.FC = () => {
                 {category.dates2026.map((m, idx) => (
                   <div
                     key={idx}
-                    className="p-2.5 rounded-xl bg-orange-50/50 border border-orange-100/80 flex items-center justify-between text-xs gap-2"
+                    className="p-2.5 rounded-xl bg-orange-50/50 border border-orange-100/80 flex items-center justify-between flex-nowrap text-xs gap-2"
                   >
-                    <div>
-                      <span className="font-extrabold text-orange-950">{m.dayMr}</span>
-                      <span className="text-slate-500 text-[11px] ml-1.5 font-medium">({m.nakshatra})</span>
+                    <div className="min-w-0 flex-1">
+                      <span className="font-extrabold text-orange-950 block truncate whitespace-nowrap">{m.dayMr}</span>
+                      <span className="text-slate-500 text-[11px] font-medium block truncate">({m.nakshatra})</span>
                     </div>
-                    <div className="text-right">
-                      <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 font-bold text-[10px]">
+                    <div className="text-right shrink-0">
+                      <span className="inline-block px-2 py-1 rounded-md bg-amber-100 text-amber-950 font-bold text-[10px] whitespace-nowrap">
                         {m.muhuratTime}
                       </span>
                     </div>
@@ -471,25 +472,31 @@ export const MuhuratAndSevaMargView: React.FC = () => {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-3 sm:p-5 animate-in fade-in"
+          aria-label={language === 'mr' ? 'प्रत्यक्ष मूर्ती दर्शन' : 'Shree Swami Samarth Darshan'}
+          onClick={() => setShowFullDarshan(false)}
+          className="fixed inset-0 z-50 h-dvh bg-black/95 backdrop-blur-md flex flex-col items-center justify-between px-3 sm:px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] animate-in fade-in overflow-hidden"
         >
           {/* Top Bar with Title & Close Button */}
-          <div className="w-full max-w-xl flex items-center justify-between text-white pt-2 px-1">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" />
-              <div>
-                <h3 className="font-black text-sm sm:text-base text-amber-100">
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-xl flex items-center justify-between text-white px-1 shrink-0"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+              <div className="min-w-0">
+                <h3 className="font-black text-sm sm:text-base text-amber-100 truncate">
                   {language === 'mr' ? 'प्रत्यक्ष मूर्ती दर्शन' : 'Shree Swami Samarth Darshan'}
                 </h3>
-                <p className="text-[11px] text-amber-300/80">
+                <p className="text-[11px] text-amber-300/80 truncate">
                   {language === 'mr' ? 'जयसिंगपूर सेवा दरबार' : 'Jaysingpur Seva Darbar'}
                 </p>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={() => setShowFullDarshan(false)}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition active:scale-90"
+              className="min-w-[44px] min-h-[44px] rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition active:scale-90 shrink-0"
               aria-label="Close Darshan"
             >
               <X className="w-6 h-6" />
@@ -497,16 +504,22 @@ export const MuhuratAndSevaMargView: React.FC = () => {
           </div>
 
           {/* Full High-Resolution Uncropped Murti Frame */}
-          <div className="relative flex-1 w-full max-w-md flex items-center justify-center my-2 overflow-hidden rounded-3xl border-2 border-amber-400/50 shadow-2xl bg-black">
+          <div
+            onClick={e => e.stopPropagation()}
+            className="relative flex-1 min-h-0 w-full max-w-md flex items-center justify-center my-2 overflow-hidden rounded-3xl border-2 border-amber-400/50 shadow-2xl bg-black"
+          >
             <img
               src="/assets/aistudio/img_2912_1024_edcd846d.jpg"
               alt="श्री स्वामी समर्थ प्रत्यक्ष मूर्ती दर्शन"
-              className="w-full h-full object-contain"
+              className="max-w-full max-h-full object-contain"
             />
           </div>
 
           {/* Auspicious Chanting Footer */}
-          <div className="w-full max-w-xl text-center space-y-1 pb-2">
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-xl text-center space-y-0.5 shrink-0 [@media(max-height:420px)]:hidden"
+          >
             <p className="text-sm sm:text-base font-black text-amber-300 tracking-wide">
               ॥ श्री स्वामी समर्थ जय जय स्वामी समर्थ ॥
             </p>

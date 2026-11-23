@@ -1,9 +1,9 @@
-import { DayData, MonthMeta } from '../types/calendar';
+import type { DayData, MonthMeta } from '../types/calendar';
 import {
   getMultiYearMonthDays,
   getMultiYearMonthMeta,
   SUPPORTED_YEARS,
-  SupportedYear,
+  type SupportedYear,
 } from './calendarMultiYear';
 
 export { SUPPORTED_YEARS, type SupportedYear };
@@ -143,6 +143,12 @@ export function getYearlySpecialDays(
 export function searchYear(query: string, year: number = 2026): DayData[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
+  const qCompact = q.replace(/\s+/g, '');
+
+  const textMatches = (val: string) => {
+    const lower = val.toLowerCase();
+    return lower.includes(q) || lower.replace(/\s+/g, '').includes(qCompact);
+  };
 
   const matches: DayData[] = [];
   for (let m = 1; m <= 12; m++) {
@@ -150,13 +156,13 @@ export function searchYear(query: string, year: number = 2026): DayData[] {
     for (const day of days) {
       const matchFestival = day.festivals.some(
         f =>
-          f.title.toLowerCase().includes(q) ||
-          f.titleEn.toLowerCase().includes(q) ||
-          f.description.toLowerCase().includes(q)
+          textMatches(f.title) ||
+          textMatches(f.titleEn) ||
+          textMatches(f.description)
       );
-      const matchTithi = day.tithi.toLowerCase().includes(q);
-      const matchNakshatra = day.nakshatra.toLowerCase().includes(q);
-      const matchDay = day.marathiDayName.toLowerCase().includes(q);
+      const matchTithi = textMatches(day.tithi);
+      const matchNakshatra = textMatches(day.nakshatra);
+      const matchDay = textMatches(day.marathiDayName);
 
       if (matchFestival || matchTithi || matchNakshatra || matchDay) {
         matches.push(day);

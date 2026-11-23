@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { getTodayDateInfo } from '../utils/calendarLogic';
 import {
   getNotificationSettings,
@@ -8,14 +9,17 @@ import {
   requestNotificationPermission,
   isNotificationSupported,
   buildTodayNotificationMessage,
-  NotificationSettings,
+  type NotificationSettings,
+  type NotificationCapabilities,
+  getNotificationCapabilities,
   getCustomTimerState,
   saveCustomTimerState,
   sendTimerAlertNotification,
-  CustomTimerState,
+  type CustomTimerState,
   scheduleFutureDailyAlarms,
   testBackgroundNotification,
   registerPeriodicDailySync,
+  unregisterPeriodicDailySync,
 } from '../utils/notificationService';
 import {
   Bell,
@@ -58,6 +62,9 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
   const [bgTestCountdown, setBgTestCountdown] = useState<number | null>(null);
   const [showBatteryHelp, setShowBatteryHelp] = useState(false);
+  const [capabilities, setCapabilities] = useState<NotificationCapabilities | null>(null);
+
+  const dialogRef = useDialogA11y(isOpen, onClose);
 
   // Custom Timer States
   const [timerState, setTimerState] = useState<CustomTimerState | null>(getCustomTimerState());
@@ -71,11 +78,13 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const todayMessage = buildTodayNotificationMessage(todayInfo.dayData, language);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setPermission(Notification.permission);
     }
     const current = getCustomTimerState();
     setTimerState(current);
+    void getNotificationCapabilities().then(setCapabilities);
   }, [isOpen]);
 
   // Live countdown ticker for custom timer
@@ -113,7 +122,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const handleToggleEnable = async () => {
     if (!settings.enabled) {
       if (isNotificationSupported()) {
-        const res = await requestNotificationPermission();
+        const res = await requestNotificationPermission(language);
         setPermission(res);
         if (res === 'denied') {
           setErrorMessage(
@@ -124,32 +133,33 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           return;
         }
       }
-      const updated = { ...settings, enabled: true };
+      const updated: NotificationSettings = { ...settings, enabled: true, language };
       setSettings(updated);
       saveNotificationSettings(updated);
       setErrorMessage(null);
-      // Auto register periodic sync and upcoming alarms
-      registerPeriodicDailySync();
-      scheduleFutureDailyAlarms(7, settings.time, language);
+      await registerPeriodicDailySync();
+      await scheduleFutureDailyAlarms(7, settings.time, language);
+      void getNotificationCapabilities().then(setCapabilities);
     } else {
-      const updated = { ...settings, enabled: false };
+      const updated: NotificationSettings = { ...settings, enabled: false, language };
       setSettings(updated);
       saveNotificationSettings(updated);
+      await unregisterPeriodicDailySync();
     }
   };
 
   const handleChangeTime = (time: string) => {
     if (!time) return;
-    const updated = { ...settings, time };
+    const updated: NotificationSettings = { ...settings, time, language };
     setSettings(updated);
     saveNotificationSettings(updated);
     if (settings.enabled) {
-      scheduleFutureDailyAlarms(7, time, language);
+      void scheduleFutureDailyAlarms(7, time, language);
     }
   };
 
   const handleToggleSound = () => {
-    const updated = { ...settings, soundEnabled: !settings.soundEnabled };
+    const updated: NotificationSettings = { ...settings, soundEnabled: !settings.soundEnabled, language };
     setSettings(updated);
     saveNotificationSettings(updated);
   };
@@ -159,27 +169,40 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     setScheduleSuccessMsg(null);
 
     if (isNotificationSupported() && Notification.permission !== 'granted') {
-      const res = await requestNotificationPermission();
+      const res = await requestNotificationPermission(language);
       setPermission(res);
       if (res !== 'granted') {
         setErrorMessage(
           language === 'mr'
-            ? 'कृपया नोटिफिकेशन परवानगी द्या जेणेकरून अलार्म सेट करता येतील.'
-            : 'Please allow notification permission to schedule alarms.'
+            ? 'कृपया नोटिफिकेशन परवानगी द्या जेणेकरून स्मरणपत्र सेट करता येतील.'
+            : 'Please allow notification permission to schedule reminders.'
         );
         return;
       }
     }
 
-    await registerPeriodicDailySync();
-    await scheduleFutureDailyAlarms(7, settings.time, language);
+    const updated: NotificationSettings = { ...settings, enabled: true, language };
+    setSettings(updated);
+    saveNotificationSettings(updated);
+
+    const periodicOk = await registerPeriodicDailySync();
+    const scheduledCount = await scheduleFutureDailyAlarms(7, settings.time, language);
+    void getNotificationCapabilities().then(setCapabilities);
 
     setScheduleSuccessMsg(
-      language === 'mr'
-        ? `✅ पुढील ७ दिवसांचे दैनिक अलार्म (${settings.time}) यशस्वीरीत्या शेड्यूल झाले! अॅप बंद असतानाही हे दररोज वाजतील.`
-        : `✅ Next 7 days daily alarms (${settings.time}) scheduled! They will trigger even when the app is closed.`
+      scheduledCount > 0
+        ? language === 'mr'
+          ? `✅ पुढील ${scheduledCount} दिवसांचे स्मरणपत्र (${settings.time}) शेड्यूल झाले (ब्राऊझर क्षमतेनुसार बेस्ट-एफर्ट).`
+          : `✅ Scheduled ${scheduledCount} daily reminders (${settings.time}) via browser triggers (best-effort).`
+        : periodicOk
+        ? language === 'mr'
+          ? `✅ प्राधान्ये (${settings.time}) सेव्ह झाली व Periodic Background Sync नोंदणी झाली. अ‍ॅप उघडे असताना किंवा ब्राऊझरने परवानगी दिल्यास सूचना येईल.`
+          : `✅ Preferences (${settings.time}) saved and Periodic Sync registered. Reminders run best-effort based on browser/OS policy.`
+        : language === 'mr'
+        ? `✅ प्राधान्ये (${settings.time}) सेव्ह झाली. या ब्राऊझरमध्ये अ‍ॅप उघडल्यावर किंवा सक्रिय असताना स्मरणपत्र दाखवले जाईल.`
+        : `✅ Preferences (${settings.time}) saved. On this browser, reminders trigger when the app is open (best-effort).`
     );
-    setTimeout(() => setScheduleSuccessMsg(null), 6000);
+    setTimeout(() => setScheduleSuccessMsg(null), 6500);
   };
 
   const handleDelayedBgTest = async () => {
@@ -338,11 +361,22 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-orange-200 overflow-hidden flex flex-col max-h-[92vh]">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notification-modal-title"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+    >
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl border border-orange-200 overflow-hidden flex flex-col max-h-[90dvh] pb-[env(safe-area-inset-bottom)] focus:outline-none"
+      >
         {/* Modal Header */}
-        <div className="relative bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 px-4 py-3.5 sm:px-5 sm:py-4 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
+        <div className="relative bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 px-4 py-3.5 sm:px-5 sm:py-4 text-white flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-10 h-10 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-300 to-yellow-100 ring-2 ring-white/60 shrink-0 shadow-sm overflow-hidden">
               <img
                 src="/pwa-192x192.png"
@@ -350,54 +384,53 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 className="w-full h-full object-cover rounded-xl"
               />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-black leading-tight text-white">
-                  {modalTab === 'timer' ? t('customTimerTitle') : t('dailyNotifTitle')}
-                </h3>
-              </div>
-              <p className="text-[11px] text-amber-100 font-medium leading-tight mt-0.5">
+            <div className="min-w-0">
+              <h3 id="notification-modal-title" className="text-base sm:text-lg font-black leading-tight text-white truncate">
+                {modalTab === 'timer' ? t('customTimerTitle') : t('dailyNotifTitle')}
+              </h3>
+              <p className="text-[11px] text-amber-100 font-medium leading-tight mt-0.5 truncate">
                 {modalTab === 'timer' ? t('customTimerDesc') : t('dailyNotifDesc')}
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            aria-label="Close"
-            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white active:scale-90 transition shrink-0"
+            aria-label={t('close')}
+            className="min-w-[44px] min-h-[44px] rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center active:scale-90 transition shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Switcher: Daily Morning Alert vs Custom Timer */}
-        <div className="grid grid-cols-2 p-1.5 bg-orange-50/70 border-b border-orange-200 shrink-0">
+        <div className="grid grid-cols-2 gap-1 p-1.5 bg-orange-50/70 border-b border-orange-200 shrink-0">
           <button
             type="button"
             onClick={() => setModalTab('daily')}
-            className={`py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+            className={`min-h-[44px] py-2 px-2.5 sm:px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap min-w-0 ${
               modalTab === 'daily'
                 ? 'bg-white text-orange-950 shadow-xs border border-orange-200'
                 : 'text-slate-600 hover:text-orange-900'
             }`}
           >
-            <Bell className="w-3.5 h-3.5 text-orange-600" />
-            <span>{t('dailyAlertTab')}</span>
+            <Bell className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+            <span className="truncate">{t('dailyAlertTab')}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setModalTab('timer')}
-            className={`py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+            className={`min-h-[44px] py-2 px-2.5 sm:px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap min-w-0 ${
               modalTab === 'timer'
                 ? 'bg-white text-orange-950 shadow-xs border border-orange-200'
                 : 'text-slate-600 hover:text-orange-900'
             }`}
           >
-            <Timer className="w-3.5 h-3.5 text-orange-600" />
-            <span>{t('customTimerTab')}</span>
+            <Timer className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+            <span className="truncate">{t('customTimerTab')}</span>
             {timerState?.active && (
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" aria-hidden="true" />
             )}
           </button>
         </div>
@@ -410,55 +443,84 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               {/* Main Activation Toggle */}
               <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50/40 border border-orange-200/80">
                 <div className="space-y-0.5 pr-2">
-                  <span className="text-sm font-extrabold text-orange-950 block">
+                  <span id="daily-notif-switch-label" className="text-sm font-extrabold text-orange-950 block">
                     {t('dailyNotifEnable')}
                   </span>
                   <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                     {settings.enabled ? t('dailyNotifEnabledStatus') : t('dailyNotifDisabledStatus')}
                   </span>
                 </div>
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.enabled}
+                  aria-labelledby="daily-notif-switch-label"
                   onClick={handleToggleEnable}
-                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-2 focus-visible:outline-orange-600 ${
                     settings.enabled ? 'bg-orange-600' : 'bg-slate-300'
                   }`}
                 >
                   <span
                     className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      settings.enabled ? 'translate-x-5' : 'translate-x-0'
+                      settings.enabled ? 'translate-x-6' : 'translate-x-0.5'
                     }`}
                   />
                 </button>
               </div>
 
-              {/* Background Status & Closed App Feature Banner */}
+              {/* Honest Best-Effort Background Reminder Capability Card */}
               <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300/80 space-y-2">
                 <div className="flex items-center gap-2">
                   <Smartphone className="w-4 h-4 text-orange-600 shrink-0" />
                   <span className="text-xs font-black text-amber-950">
                     {language === 'mr'
-                      ? '📱 बॅकग्राउंड मोड: अॅप बंद असतानाही सूचना'
-                      : '📱 Background Mode: Alerts when app is closed'}
+                      ? 'ब्राऊझर स्मरणपत्रे (बेस्ट-एफर्ट / डिव्हाइस क्षमतेनुसार)'
+                      : 'Browser Reminders (Best-Effort by Device)'}
                   </span>
                 </div>
                 <p className="text-[11px] text-amber-900 leading-relaxed">
                   {language === 'mr'
-                    ? 'सेवा केंद्र PWA सिस्टीम अलार्म व Periodic Background Sync द्वारे अॅप पूर्णपणे बंद (Force Close) असतानाही सकाळी सूचना पाठवते.'
-                    : 'Works even when the app is completely closed via OS alarms and periodic background sync.'}
+                    ? 'वेब अ‍ॅप स्मरणपत्रे अ‍ॅप सुरू असताना ठरलेल्या वेळी खात्रीने चालतात. अ‍ॅप बंद असतानाची सूचना ब्राऊझर व फोनच्या बॅटरी नियमांवर (Best-Effort) अवलंबून असते. बंद केल्यास कोणतीही बॅकग्राउंड सूचना येणार नाही.'
+                    : 'Web reminders fire reliably while the app is open. Background delivery when closed is best-effort and depends on your browser and OS battery policy. Turning reminders off stops all background alerts.'}
                 </p>
 
-                {/* 1-Tap Schedule 7 Days Alarms Button */}
+                {capabilities && (
+                  <div className="grid grid-cols-2 gap-1.5 text-[10.5px] font-bold pt-0.5">
+                    <div className="px-2 py-1.5 rounded-lg bg-white/80 border border-amber-200/70 text-slate-700 truncate whitespace-nowrap">
+                      {language === 'mr' ? 'सूचना:' : 'Permission:'}{' '}
+                      <span className={permission === 'granted' ? 'text-emerald-700' : 'text-amber-800'}>
+                        {permission === 'granted'
+                          ? language === 'mr' ? 'मंजूर' : 'Allowed'
+                          : permission === 'denied'
+                          ? language === 'mr' ? 'बंद' : 'Blocked'
+                          : language === 'mr' ? 'बाकी' : 'Ask'}
+                      </span>
+                    </div>
+                    <div className="px-2 py-1.5 rounded-lg bg-white/80 border border-amber-200/70 text-slate-700 truncate whitespace-nowrap">
+                      {language === 'mr' ? 'सिंक:' : 'Sync:'}{' '}
+                      <span className={capabilities.periodicSync || capabilities.timestampTrigger ? 'text-emerald-700' : 'text-slate-600'}>
+                        {capabilities.timestampTrigger
+                          ? language === 'mr' ? 'शेड्यूल' : 'Triggers'
+                          : capabilities.periodicSync
+                          ? language === 'mr' ? 'बेस्ट-एफर्ट' : 'Best-effort'
+                          : language === 'mr' ? 'अ‍ॅपमध्ये' : 'In-app'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 1-Tap Schedule / Sync Button */}
                 <button
                   type="button"
                   onClick={handleSchedule7DaysAlarms}
-                  className="w-full py-2 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-98"
+                  className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-98 whitespace-nowrap"
                 >
-                  <CalendarCheck className="w-3.5 h-3.5" />
-                  <span>
+                  <CalendarCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">
                     {language === 'mr'
-                      ? 'पुढील ७ दिवसांचे दैनिक अलार्म शेड्यूल करा'
-                      : 'Schedule Next 7 Days Daily Alarms'}
+                      ? '७ दिवसांचे स्मरणपत्र सेव्ह करा'
+                      : 'Save & Sync 7-Day Reminders'}
                   </span>
                 </button>
               </div>
@@ -481,7 +543,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                         key={opt.value}
                         type="button"
                         onClick={() => handleChangeTime(opt.value)}
-                        className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition ${
+                        className={`min-h-[44px] py-1.5 px-2 rounded-xl text-[11px] font-bold border transition ${
                           settings.time === opt.value
                             ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
                             : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
@@ -501,7 +563,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                       type="time"
                       value={settings.time}
                       onChange={e => handleChangeTime(e.target.value)}
-                      className="px-2 py-1 text-xs font-black rounded-xl border border-orange-300 bg-white text-orange-950 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="min-h-[44px] px-2.5 py-1.5 text-base sm:text-xs font-black rounded-xl border border-orange-300 bg-white text-orange-950 focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
                 </div>
@@ -525,7 +587,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                   <button
                     type="button"
                     onClick={handleToggleSound}
-                    className={`mt-2 py-1.5 px-3 rounded-xl text-xs font-bold border transition text-center ${
+                    className={`mt-2 min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold border transition text-center ${
                       settings.soundEnabled
                         ? 'bg-amber-100 text-amber-900 border-amber-300'
                         : 'bg-white text-slate-500 border-slate-200'
@@ -538,12 +600,12 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
               {/* Today's Live Preview */}
               <div className="rounded-2xl bg-orange-50/70 p-3.5 border border-orange-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-orange-950 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-orange-600" />
-                    {t('todayPreview')}
+                <div className="flex items-center justify-between flex-nowrap gap-2">
+                  <span className="text-xs font-black text-orange-950 flex items-center gap-1.5 min-w-0 truncate">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                    <span className="truncate">{t('todayPreview')}</span>
                   </span>
-                  <span className="text-[10px] font-bold text-orange-800 bg-orange-200/60 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold text-orange-800 bg-orange-200/60 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 tabular-nums">
                     {settings.time}
                   </span>
                 </div>
@@ -568,33 +630,33 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 <button
                   type="button"
                   onClick={handleTestNotification}
-                  className="py-2.5 px-3 rounded-2xl bg-white border border-orange-300 text-orange-900 font-bold text-xs hover:bg-orange-50 active:scale-98 flex items-center justify-center gap-1.5 transition shadow-2xs"
+                  className="min-h-[44px] py-2.5 px-3 rounded-2xl bg-white border border-orange-300 text-orange-900 font-bold text-xs hover:bg-orange-50 active:scale-98 flex items-center justify-center gap-1.5 transition shadow-2xs whitespace-nowrap"
                 >
-                  <Send className="w-3.5 h-3.5 text-orange-600" />
-                  <span>{t('dailyNotifTestBtn')}</span>
+                  <Send className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                  <span className="truncate">{t('dailyNotifTestBtn')}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleDelayedBgTest}
                   disabled={bgTestCountdown !== null}
-                  className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 active:scale-98 text-white font-black text-xs flex items-center justify-center gap-1.5 transition shadow-xs disabled:opacity-75"
+                  className="min-h-[44px] py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 active:scale-98 text-white font-black text-xs flex items-center justify-center gap-1.5 transition shadow-xs disabled:opacity-75 whitespace-nowrap"
                 >
-                  <Zap className="w-3.5 h-3.5 fill-current" />
-                  <span>
+                  <Zap className="w-3.5 h-3.5 fill-current shrink-0" />
+                  <span className="truncate">
                     {bgTestCountdown !== null
                       ? language === 'mr'
                         ? `अॅप बंद करा (${bgTestCountdown}s)...`
                         : `Close App (${bgTestCountdown}s)...`
                       : language === 'mr'
-                      ? '५ सेकंदात बॅकग्राउंड चाचणी (अॅप बंद करा)'
-                      : '5s Background Test (Close App)'}
+                      ? '५ से. बॅकग्राउंड चाचणी'
+                      : '5s Background Test'}
                   </span>
                 </button>
               </div>
 
               {bgTestCountdown !== null && (
-                <div className="p-3 rounded-2xl bg-amber-100 border border-amber-300 text-amber-950 text-xs font-bold text-center animate-pulse">
+                <div className="p-3 rounded-2xl bg-amber-100 border border-amber-300 text-amber-950 text-xs font-bold text-center">
                   🔔{' '}
                   {language === 'mr'
                     ? 'कृपया आता होम स्क्रीनवर जा किंवा फोन लॉक करा! ५ सेकंदात नोटिफिकेशन येईल.'
@@ -607,20 +669,20 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowBatteryHelp(!showBatteryHelp)}
-                  className="w-full p-2.5 text-left text-xs font-bold text-slate-800 flex items-center justify-between hover:bg-slate-100/70"
+                  className="w-full min-h-[44px] p-2.5 text-left text-xs font-bold text-slate-800 flex items-center justify-between flex-nowrap gap-2 hover:bg-slate-100/70"
                 >
-                  <span className="flex items-center gap-1.5">
-                    <Info className="w-3.5 h-3.5 text-amber-600" />
-                    <span>
+                  <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span className="truncate">
                       {language === 'mr'
-                        ? 'अॅप बंद असताना सूचना न आल्यास काय करावे?'
-                        : 'Troubleshooting closed-app notifications'}
+                        ? 'अॅप बंद असताना सूचना न आल्यास?'
+                        : 'Closed-app notification tips'}
                     </span>
                   </span>
                   {showBatteryHelp ? (
-                    <ChevronUp className="w-4 h-4 text-slate-500" />
+                    <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-slate-500" />
+                    <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
                   )}
                 </button>
 
@@ -690,8 +752,9 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                   </div>
 
                   <button
+                    type="button"
                     onClick={handleCancelTimer}
-                    className="w-full py-2.5 px-4 rounded-xl bg-white text-rose-700 font-black text-xs hover:bg-rose-50 active:scale-98 transition flex items-center justify-center gap-2 shadow-xs"
+                    className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-white text-rose-700 font-black text-xs hover:bg-rose-50 active:scale-98 transition flex items-center justify-center gap-2 shadow-xs"
                   >
                     <Square className="w-3.5 h-3.5 text-rose-600 fill-current" />
                     <span>{t('stopTimer')}</span>
@@ -707,7 +770,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                       <span>{t('selectDuration')}</span>
                     </label>
 
-                    <div className="grid grid-cols-6 gap-1">
+                    <div className="grid grid-cols-3 xs:grid-cols-6 gap-1.5">
                       {[5, 10, 15, 20, 30, 45].map((mins) => (
                         <button
                           key={mins}
@@ -716,7 +779,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                             setSelectedMinutes(mins);
                             setCustomInputMinutes('');
                           }}
-                          className={`py-2 rounded-xl text-xs font-bold border transition ${
+                          className={`min-h-[44px] py-2 rounded-xl text-xs font-bold border transition ${
                             selectedMinutes === mins && !customInputMinutes
                               ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
                               : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
@@ -727,12 +790,13 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                       ))}
                     </div>
 
-                    <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-200">
-                      <span className="text-[11px] font-bold text-slate-600">
+                    <div className="pt-2 flex items-center justify-between flex-nowrap gap-2 border-t border-slate-200">
+                      <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap shrink-0">
                         {t('customMinutes')}:
                       </span>
                       <input
                         type="number"
+                        inputMode="numeric"
                         min="1"
                         max="360"
                         placeholder="उदा. 25"
@@ -743,16 +807,16 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                             setSelectedMinutes(parseInt(e.target.value, 10) || 15);
                           }
                         }}
-                        className="w-24 px-2.5 py-1 text-xs font-bold rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-24 sm:w-28 min-h-[44px] px-2.5 py-1.5 text-base sm:text-sm font-bold rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
-                      <span className="text-[11px] text-slate-500">{t('minutes')}</span>
+                      <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{t('minutes')}</span>
                     </div>
                   </div>
 
                   {/* Select Purpose */}
                   <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-200 space-y-2">
                     <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                      <Flame className="w-3.5 h-3.5 text-orange-600" />
+                      <Flame className="w-3.5 h-3.5 text-orange-600 shrink-0" />
                       <span>{t('reminderPurpose')}</span>
                     </label>
 
@@ -767,13 +831,13 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                           key={item.key}
                           type="button"
                           onClick={() => setTimerPurpose(item.key)}
-                          className={`p-2.5 rounded-xl text-[11px] font-black border text-left transition flex items-center gap-1.5 leading-snug ${
+                          className={`min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-black border text-left transition flex items-center gap-1.5 whitespace-nowrap min-w-0 ${
                             timerPurpose === item.key
                               ? 'bg-orange-50 text-orange-950 border-orange-500 ring-1 ring-orange-400'
                               : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300'
                           }`}
                         >
-                          <span>{item.label}</span>
+                          <span className="truncate">{item.label}</span>
                         </button>
                       ))}
                     </div>
@@ -782,20 +846,21 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                   {/* Action Buttons: Start Timer + Quick 10s Test */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button
+                      type="button"
                       onClick={handleStartTimer}
-                      className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/10 flex items-center justify-center gap-2 transition"
+                      className="w-full min-h-[44px] py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/10 flex items-center justify-center gap-2 transition whitespace-nowrap"
                     >
-                      <Play className="w-4 h-4 fill-current" />
-                      <span>{t('startTimer')}</span>
+                      <Play className="w-4 h-4 fill-current shrink-0" />
+                      <span className="truncate">{t('startTimer')}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={handleStartQuickTest}
-                      className="w-full py-3 px-3 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-black text-xs sm:text-sm shadow-md shadow-amber-900/10 flex items-center justify-center gap-1.5 transition"
+                      className="w-full min-h-[44px] py-3 px-3 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-black text-xs sm:text-sm shadow-md shadow-amber-900/10 flex items-center justify-center gap-1.5 transition whitespace-nowrap"
                     >
-                      <Zap className="w-4 h-4 fill-current" />
-                      <span>
+                      <Zap className="w-4 h-4 fill-current shrink-0" />
+                      <span className="truncate">
                         {language === 'mr' ? '१० सेकंद जलद चाचणी' : '10s Quick Test'}
                       </span>
                     </button>

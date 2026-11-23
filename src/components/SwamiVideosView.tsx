@@ -523,12 +523,12 @@ export const SwamiVideosView: React.FC<SwamiVideosViewProps> = ({ onOpenOfflineV
         )}
 
         {/* Active Video Title, Metadata & Quick Offline Save Action */}
-        <div className="flex items-end justify-between gap-2 pt-0.5 px-0.5 flex-wrap">
-          <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="space-y-2 pt-0.5 px-0.5">
+          <div className="min-w-0 space-y-0.5">
             <h3 className="text-sm sm:text-base font-black text-white leading-snug line-clamp-2">
               {activeVideo.title}
             </h3>
-            <p className="text-[11px] text-amber-100/90 font-medium">
+            <p className="text-[11px] text-amber-100/90 font-medium truncate whitespace-nowrap">
               {language === 'mr' ? KUMUDINI_CHANNEL_INFO.artistMr : KUMUDINI_CHANNEL_INFO.artistEn}
               {activeVideo.publishedAt && (
                 <>
@@ -544,10 +544,10 @@ export const SwamiVideosView: React.FC<SwamiVideosViewProps> = ({ onOpenOfflineV
               type="button"
               disabled={isSavingFile}
               onClick={() => fileInputRef.current?.click()}
-              className="min-h-[36px] px-2.5 py-1.5 rounded-xl bg-black/25 hover:bg-black/35 border border-amber-300/35 text-amber-100 text-[11px] font-bold flex items-center gap-1.5 transition whitespace-nowrap shrink-0"
+              className="w-full sm:w-auto min-h-[44px] px-3.5 py-2 rounded-xl bg-black/25 hover:bg-black/35 border border-amber-300/35 text-amber-100 text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap"
             >
               <Upload className="w-3.5 h-3.5 shrink-0" />
-              <span>
+              <span className="truncate">
                 {hasOfflineFile
                   ? language === 'mr'
                     ? 'ऑफलाईन फाईल बदला'
@@ -564,12 +564,12 @@ export const SwamiVideosView: React.FC<SwamiVideosViewProps> = ({ onOpenOfflineV
         {/* Action Header: Video Count, Refresh Uploads, Offline Vault & Subscribe */}
         <div className="p-3.5 sm:p-4 border-b border-orange-100 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="text-sm sm:text-base font-black text-orange-950 flex items-center gap-1.5">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm sm:text-base font-black text-orange-950 flex items-center gap-1.5 min-w-0">
                 <ListVideo className="w-4 h-4 text-orange-600 shrink-0" />
                 <span className="truncate">{t('swamiVideosPlaylistTitle')}</span>
               </h3>
-              <p className="text-xs text-slate-500 font-medium tabular-nums mt-0.5">
+              <p className="text-xs text-slate-500 font-medium tabular-nums mt-0.5 truncate">
                 {language === 'mr'
                   ? `${toMarathiDigits(videos.length)} भजने · ${toMarathiDigits(savedSongsCount)} ऑफलाईन सेव्ह`
                   : `${videos.length} devotional videos · ${savedSongsCount} saved offline`}
@@ -577,25 +577,25 @@ export const SwamiVideosView: React.FC<SwamiVideosViewProps> = ({ onOpenOfflineV
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className={`grid gap-2 ${onOpenOfflineVault ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
             <button
               type="button"
               onClick={() => fetchChannelVideos(true)}
               disabled={isRefreshing}
-              className="flex-1 sm:flex-none min-h-[42px] px-3 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-950 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap disabled:opacity-60"
+              className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-950 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap min-w-0 disabled:opacity-60"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-orange-700 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? t('swamiVideosSyncing') : t('swamiVideosRefresh')}</span>
+              <span className="truncate">{isRefreshing ? t('swamiVideosSyncing') : t('swamiVideosRefresh')}</span>
             </button>
 
             {onOpenOfflineVault && (
               <button
                 type="button"
                 onClick={onOpenOfflineVault}
-                className="flex-1 sm:flex-none min-h-[42px] px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300/80 text-orange-950 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap"
+                className="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300/80 text-orange-950 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap min-w-0"
               >
                 <HardDrive className="w-3.5 h-3.5 text-orange-700 shrink-0" />
-                <span>{t('openOfflineVaultBtn')}</span>
+                <span className="truncate">{t('openOfflineVaultBtn')}</span>
               </button>
             )}
 
@@ -603,10 +603,10 @@ export const SwamiVideosView: React.FC<SwamiVideosViewProps> = ({ onOpenOfflineV
               href={KUMUDINI_CHANNEL_INFO.subscribeUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 sm:flex-none min-h-[42px] px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap shadow-2xs"
+              className={`${onOpenOfflineVault ? 'col-span-2 sm:col-span-1' : ''} min-h-[44px] px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap min-w-0 shadow-2xs`}
             >
               <Youtube className="w-4 h-4 shrink-0" />
-              <span>{t('swamiVideosSubscribe')}</span>
+              <span className="truncate">{t('swamiVideosSubscribe')}</span>
               <ExternalLink className="w-3 h-3 shrink-0" />
             </a>
           </div>
@@ -692,8 +692,8 @@ export const SwamiVideosView: React.FC<SwamiVideosViewProps> = ({ onOpenOfflineV
                     {video.title}
                   </p>
 
-                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 tabular-nums flex-wrap">
-                    <span>
+                  <div className="flex items-center gap-x-1.5 gap-y-0.5 text-[11px] font-medium text-slate-500 tabular-nums flex-wrap">
+                    <span className="whitespace-nowrap">
                       {language === 'mr'
                         ? `#${toMarathiDigits(index + 1)}`
                         : `#${index + 1}`}
@@ -701,13 +701,13 @@ export const SwamiVideosView: React.FC<SwamiVideosViewProps> = ({ onOpenOfflineV
                     {video.publishedAt && (
                       <>
                         <span aria-hidden="true">·</span>
-                        <span>{formatPublishDate(video.publishedAt, language)}</span>
+                        <span className="whitespace-nowrap">{formatPublishDate(video.publishedAt, language)}</span>
                       </>
                     )}
                     {savedMeta && (
                       <>
                         <span aria-hidden="true">·</span>
-                        <span className="text-emerald-700 font-bold">
+                        <span className="text-emerald-700 font-bold whitespace-nowrap">
                           {language === 'mr'
                             ? `ऑफलाईन (${formatBytes(savedMeta.sizeBytes)})`
                             : `Offline (${formatBytes(savedMeta.sizeBytes)})`}
@@ -717,7 +717,7 @@ export const SwamiVideosView: React.FC<SwamiVideosViewProps> = ({ onOpenOfflineV
                     {isSelected && (
                       <>
                         <span aria-hidden="true">·</span>
-                        <span className="text-orange-700 font-bold">
+                        <span className="text-orange-700 font-bold whitespace-nowrap">
                           {language === 'mr' ? 'सध्या सुरू' : 'Now Playing'}
                         </span>
                       </>

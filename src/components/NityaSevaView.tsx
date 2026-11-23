@@ -200,8 +200,9 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
         ].map(tab => (
           <button
             key={tab.id}
+            type="button"
             onClick={() => setActiveTab(tab.id as any)}
-            className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all active:scale-95 ${
+            className={`min-h-[44px] px-3.5 py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all active:scale-95 shrink-0 ${
               activeTab === tab.id
                 ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-xs'
                 : 'bg-orange-50/70 hover:bg-orange-100/70 text-orange-950 border border-orange-200/50'
@@ -249,7 +250,11 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
 
           {/* Celebration Banner */}
           {showCelebration && (
-            <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 p-3.5 text-white shadow-md animate-bounce">
+            <div
+              role="status"
+              aria-live="polite"
+              className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 p-3.5 text-white shadow-md animate-in fade-in duration-300"
+            >
               <div className="flex items-center justify-center gap-2">
                 <Award className="w-5 h-5 text-amber-200" />
                 <span className="font-extrabold text-sm sm:text-base">
@@ -268,9 +273,9 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
             </div>
           )}
 
-          {/* Interactive Circular Mala Wheel & Tap Center */}
+          {/* Interactive Circular Mala Wheel & Tap Center (scales cleanly on 320px & landscape) */}
           <div className="relative flex items-center justify-center py-2 sm:py-4">
-            <svg className="w-56 h-56 sm:w-64 sm:h-64 -rotate-90 transform" viewBox="0 0 100 100">
+            <svg className="w-52 h-52 xs:w-56 xs:h-56 sm:w-64 sm:h-64 [@media(max-height:520px)]:w-44 [@media(max-height:520px)]:h-44 -rotate-90 transform" viewBox="0 0 100 100">
               {/* Outer track */}
               <circle
                 cx="50"
@@ -296,9 +301,10 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
 
             {/* Central Giant Tappable Bead / Counter Pad */}
             <button
+              type="button"
               onClick={handleBeadClick}
               aria-label={`Chant bead, count ${japaCount} of 108`}
-              className="absolute w-40 h-40 sm:w-46 sm:h-46 rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-orange-700 shadow-lg shadow-orange-600/30 active:scale-95 transition-transform flex flex-col items-center justify-center text-white border-4 border-amber-200 group cursor-pointer focus:outline-none focus:ring-4 focus:ring-orange-300 select-none"
+              className="absolute w-36 h-36 xs:w-40 xs:h-40 sm:w-46 sm:h-46 [@media(max-height:520px)]:w-32 [@media(max-height:520px)]:h-32 rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-orange-700 shadow-lg shadow-orange-600/30 active:scale-95 transition-transform flex flex-col items-center justify-center text-white border-4 border-amber-200 group cursor-pointer focus:outline-none focus:ring-4 focus:ring-orange-300 select-none"
             >
               <span className="text-[11px] sm:text-xs font-bold tracking-wider text-amber-100 group-hover:text-white uppercase leading-none">
                 {t('tapToChant')}
@@ -346,70 +352,84 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
             </div>
           </div>
 
-          {/* Mala Stats & Interactive Controls - Clean non-wrapping row */}
-          <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
-            {/* Completed Malas Counter */}
-            <div className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl bg-amber-50 border border-amber-200 text-xs sm:text-sm font-bold text-amber-950 whitespace-nowrap shrink-0">
-              {t('completedMalas')} <strong className="text-orange-700 text-sm sm:text-base ml-1">{totalMalas}</strong>
+          {/* Mala Stats & Interactive Controls — 2 structured, zero-wrap mobile rows */}
+          <div className="space-y-2 pt-1 max-w-md mx-auto">
+            {/* Row 1: Completed Malas + Reset */}
+            <div className="flex items-center justify-between flex-nowrap gap-2">
+              <div className="min-h-[44px] flex items-center px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs sm:text-sm font-bold text-amber-950 whitespace-nowrap truncate min-w-0">
+                <span className="truncate">{t('completedMalas')}</span>
+                <strong className="text-orange-700 text-sm sm:text-base ml-1.5 tabular-nums shrink-0">{totalMalas}</strong>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(true)}
+                aria-label={t('reset')}
+                className="min-h-[44px] flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 hover:bg-red-50 text-xs font-bold text-red-700 active:scale-95 transition whitespace-nowrap shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                <span>{t('reset')}</span>
+              </button>
             </div>
 
-            {/* Chant Voice Style Selector: Sweet Voice | Temple Bell | Mute */}
-            <div className="flex items-center gap-1 bg-amber-50/90 p-1 rounded-xl sm:rounded-2xl border border-amber-200 text-xs shrink-0">
+            {/* Row 2: Chant Voice Style Selector (Sweet Voice | Temple Bell | Mute) */}
+            <div className="grid grid-cols-[1fr_1fr_44px] gap-1 bg-amber-50/90 p-1 rounded-xl border border-amber-200 text-xs w-full">
               <button
+                type="button"
                 onClick={() => {
                   setChantVoiceMode('voice');
                   templeSound.playSwamiChant('voice');
                 }}
-                className={`px-3 py-1.5 rounded-lg sm:rounded-xl font-bold transition-all text-xs whitespace-nowrap ${
+                className={`min-h-[44px] px-2 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs whitespace-nowrap min-w-0 flex items-center justify-center gap-1.5 ${
                   chantVoiceMode === 'voice'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'text-amber-950 hover:bg-amber-100/70'
                 }`}
                 title={language === 'mr' ? 'मधुर नामजप स्वर (ऐकण्यासाठी टॅप करा)' : 'Sweet Chant Voice (Tap to hear sample)'}
               >
-                <span className="flex items-center gap-1.5">
-                  <Volume2 className="w-3.5 h-3.5 text-inherit" />
-                  <span>{language === 'mr' ? 'मधुर नामजप स्वर' : 'Sweet Voice'}</span>
+                <Volume2 className="w-3.5 h-3.5 text-inherit shrink-0" />
+                <span className="truncate">
+                  {language === 'mr' ? (
+                    <>
+                      <span className="sm:hidden">मधुर स्वर</span>
+                      <span className="hidden sm:inline">मधुर नामजप स्वर</span>
+                    </>
+                  ) : (
+                    'Sweet Voice'
+                  )}
                 </span>
               </button>
 
               <button
+                type="button"
                 onClick={() => {
                   setChantVoiceMode('bell');
                   templeSound.playSwamiChant('bell');
                 }}
-                className={`px-3 py-1.5 rounded-lg sm:rounded-xl font-bold transition-all text-xs whitespace-nowrap ${
+                className={`min-h-[44px] px-2 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs whitespace-nowrap min-w-0 flex items-center justify-center ${
                   chantVoiceMode === 'bell'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'text-amber-950 hover:bg-amber-100/70'
                 }`}
                 title={language === 'mr' ? 'मंद घंटानाद' : 'Temple Bell'}
               >
-                <span>{language === 'mr' ? 'घंटानाद' : 'Temple Bell'}</span>
+                <span className="truncate">{language === 'mr' ? 'घंटानाद' : 'Temple Bell'}</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setChantVoiceMode('mute')}
-                className={`p-1.5 rounded-lg sm:rounded-xl font-bold transition-all text-xs ${
+                aria-label={language === 'mr' ? 'आवाज म्यूट' : 'Mute Sound'}
+                className={`min-w-[44px] min-h-[44px] rounded-lg font-bold transition-all text-xs flex items-center justify-center ${
                   chantVoiceMode === 'mute'
                     ? 'bg-slate-700 text-white shadow-xs'
                     : 'text-slate-500 hover:bg-slate-200/70'
                 }`}
                 title={language === 'mr' ? 'आवाज म्यूट (केवळ व्हायब्रेशन)' : 'Mute Sound'}
               >
-                <VolumeX className="w-3.5 h-3.5" />
+                <VolumeX className="w-4 h-4" />
               </button>
             </div>
-
-            {/* Reset Button */}
-            <button
-              onClick={() => setShowResetConfirm(true)}
-              aria-label={t('reset')}
-              className="flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border border-red-200 hover:bg-red-50 text-xs font-bold text-red-700 active:scale-95 transition whitespace-nowrap shrink-0"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-red-600" />
-              <span>{t('reset')}</span>
-            </button>
           </div>
 
           {/* Inline Reset Confirmation Dialog (100% reliable inside iframe) */}
@@ -420,24 +440,27 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
                   ? 'जप संख्या रिसेट करायची आहे का?'
                   : 'Do you want to reset the Japa counter to 0?'}
               </p>
-              <div className="flex items-center justify-center gap-2 pt-0.5">
+              <div className="flex items-center justify-center flex-wrap gap-2 pt-0.5">
                 <button
+                  type="button"
                   onClick={() => handleExecuteReset(false)}
-                  className="px-3 py-1 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition"
+                  className="min-h-[40px] px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition whitespace-nowrap"
                 >
                   {language === 'mr' ? 'संख्या ० करा' : 'Reset Count'}
                 </button>
                 {totalMalas > 0 && (
                   <button
+                    type="button"
                     onClick={() => handleExecuteReset(true)}
-                    className="px-2.5 py-1 rounded-xl bg-red-800 hover:bg-red-900 text-white font-bold text-xs shadow-xs transition"
+                    className="min-h-[40px] px-2.5 py-1.5 rounded-xl bg-red-800 hover:bg-red-900 text-white font-bold text-xs shadow-xs transition whitespace-nowrap"
                   >
                     {language === 'mr' ? 'सर्व माळा रिसेट करा' : 'Reset All'}
                   </button>
                 )}
                 <button
+                  type="button"
                   onClick={() => setShowResetConfirm(false)}
-                  className="px-3 py-1 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition"
+                  className="min-h-[40px] px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition whitespace-nowrap"
                 >
                   {t('cancel')}
                 </button>
@@ -454,15 +477,16 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
         /* Textual Stotras & Aarti View */
         <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-6 shadow-xs border border-orange-100 space-y-4">
           <div className="border-b border-orange-100 pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[11px] font-bold">
+            <div className="flex items-center justify-between flex-nowrap gap-2">
+              <span className="px-2.5 py-1 rounded-full bg-orange-100 text-orange-800 text-[11px] font-bold whitespace-nowrap truncate">
                 {selectedSeva.duration}
               </span>
               <button
+                type="button"
                 onClick={() => templeSound.playBell(880, 1.5)}
-                className="flex items-center gap-1 text-xs text-orange-700 font-bold hover:text-orange-800"
+                className="min-h-[40px] px-2.5 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200/70 flex items-center gap-1.5 text-xs text-orange-800 font-bold whitespace-nowrap shrink-0 transition active:scale-95"
               >
-                <Volume2 className="w-4 h-4" />
+                <Volume2 className="w-4 h-4 shrink-0" />
                 <span>{t('ringBell')}</span>
               </button>
             </div>
@@ -645,15 +669,15 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
                   </>
                 )}
 
-                {/* Quick Offline Vault Save Strip */}
-                <div className="flex items-center justify-between gap-2 pt-0.5 flex-wrap">
+                {/* Quick Offline Vault Save Strip — balanced 2-column non-wrapping buttons */}
+                <div className={`grid gap-2 pt-0.5 ${onOpenOfflineVault ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   <button
                     type="button"
                     onClick={() => tarakFileInputRef.current?.click()}
-                    className="min-h-[36px] px-3 py-1.5 rounded-xl bg-black/25 hover:bg-black/35 border border-amber-300/35 text-amber-100 text-[11px] font-bold flex items-center gap-1.5 transition whitespace-nowrap"
+                    className="min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-black/25 hover:bg-black/35 border border-amber-300/35 text-amber-100 text-[11px] font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap min-w-0"
                   >
                     <Upload className="w-3.5 h-3.5 shrink-0" />
-                    <span>
+                    <span className="truncate">
                       {hasOffline
                         ? language === 'mr'
                           ? 'ऑफलाईन फाईल बदला'
@@ -666,10 +690,10 @@ export const NityaSevaView: React.FC<NityaSevaViewProps> = ({ onOpenOfflineVault
                     <button
                       type="button"
                       onClick={onOpenOfflineVault}
-                      className="min-h-[36px] px-3 py-1.5 rounded-xl bg-black/20 hover:bg-black/35 border border-amber-300/25 text-amber-100 text-[11px] font-bold flex items-center gap-1.5 transition whitespace-nowrap"
+                      className="min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-black/20 hover:bg-black/35 border border-amber-300/25 text-amber-100 text-[11px] font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap min-w-0"
                     >
                       <HardDrive className="w-3.5 h-3.5 shrink-0" />
-                      <span>{t('openOfflineVaultBtn')}</span>
+                      <span className="truncate">{t('openOfflineVaultBtn')}</span>
                     </button>
                   )}
                 </div>

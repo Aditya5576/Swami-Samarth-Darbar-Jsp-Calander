@@ -35,16 +35,6 @@ export interface VaultStorageSummary {
   isPersisted: boolean;
 }
 
-export interface OfflinePrepareReport {
-  swActive: boolean;
-  cachedCoreCount: number;
-  totalCoreCount: number;
-  cachedThumbsCount: number;
-  savedSongsCount: number;
-  preparedAt: string;
-  isPersisted: boolean;
-}
-
 function openVaultDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
@@ -322,10 +312,76 @@ export async function isServiceWorkerActive(): Promise<boolean> {
   }
 }
 
+export type OfflineReadinessStatus = 'ready' | 'partial' | 'failed';
+
+export interface OfflinePrepareReport {
+  status: OfflineReadinessStatus;
+  swActive: boolean;
+  cacheStorageAvailable: boolean;
+  cachedCoreCount: number;
+  totalCoreCount: number;
+  missingCoreUrls: string[];
+  cachedThumbsCount: number;
+  totalThumbsAttempted: number;
+  savedSongsCount: number;
+  verifiedVaultCount: number;
+  unreadableVaultCount: number;
+  preparedAt: string | null;
+  isPersisted: boolean;
+}
+
+const PREPARED_STATUS_KEY = 'swami_offline_seva_prepared_status';
+
+export function getLastPreparedStatus(): OfflineReadinessStatus | null {
+  try {
+    const val = localStorage.getItem(PREPARED_STATUS_KEY);
+    if (val === 'ready' || val === 'partial' || val === 'failed') return val;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function verifyOfflineVaultIntegrity(): Promise<{
+  verifiedCount: number;
+  unreadableCount: number;
+}> {
+  try {
+    const db = await openVaultDB();
+    const result = await new Promise<{ verifiedCount: number; unreadableCount: number }>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      let verifiedCount = 0;
+      let unreadableCount = 0;
+      const cursorReq = store.openCursor();
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result;
+        if (cursor) {
+          const val = cursor.value as OfflineMediaRecord;
+          if (val && val.blob instanceof Blob && val.blob.size > 0) {
+            verifiedCount++;
+          } else {
+            unreadableCount++;
+          }
+          cursor.continue();
+        } else {
+          resolve({ verifiedCount, unreadableCount });
+        }
+      };
+      cursorReq.onerror = () => reject(cursorReq.error);
+    });
+    db.close();
+    return result;
+  } catch {
+    return { verifiedCount: 0, unreadableCount: 0 };
+  }
+}
+
 /**
  * One-tap "Prepare Offline Seva" helper:
- * Warms app core assets, Murti portrait, chant audio, live channel feed, and bhajan thumbnails
- * into Cache Storage so Seva runs smoothly with zero internet.
+ * Verifies active Service Worker, caches required core assets into Cache Storage,
+ * verifies imported vault blobs, and optionally warms thumbnails separately.
+ * Reports honest ready / partial / failed status without false 100% completion.
  */
 export async function prepareOfflineSevaApp(
   onProgress?: (percent: number, stepKey: 'sw' | 'core' | 'channel' | 'done') => void
@@ -343,46 +399,56 @@ export async function prepareOfflineSevaApp(
     '/audio/swami_samarth_chant.mp3',
   ];
 
+  let cacheStorageAvailable = false;
   let cachedCoreCount = 0;
+  const missingCoreUrls: string[] = [];
   let cachedThumbsCount = 0;
+  let totalThumbsAttempted = 0;
 
   onProgress?.(40, 'core');
   if (typeof caches !== 'undefined') {
     try {
       const cache = await caches.open(OFFLINE_CACHE_NAME);
+      cacheStorageAvailable = true;
+
       await Promise.all(
         coreUrls.map(async url => {
+          let verified = false;
           try {
-            const existing = await cache.match(url);
-            if (existing) {
-              cachedCoreCount++;
-              return;
-            }
-            const res = await fetch(url, { cache: 'reload' });
-            if (res.ok) {
-              await cache.put(url, res.clone());
-              cachedCoreCount++;
+            const existing = (await cache.match(url)) || (await caches.match(url));
+            if (existing && (existing.ok || existing.type === 'opaque')) {
+              verified = true;
+            } else {
+              const res = await fetch(url, { cache: 'reload' });
+              if (res.ok) {
+                await cache.put(url, res.clone());
+                const confirmMatch = await cache.match(url);
+                verified = Boolean(confirmMatch);
+              }
             }
           } catch {
-            // Check if precached in any Workbox cache
             const fallbackMatch = await caches.match(url);
-            if (fallbackMatch) {
-              cachedCoreCount++;
-            }
+            verified = Boolean(fallbackMatch);
+          }
+
+          if (verified) {
+            cachedCoreCount++;
+          } else {
+            missingCoreUrls.push(url);
           }
         })
       );
 
       onProgress?.(72, 'channel');
-      // Refresh channel feed if online and cache thumbnails for offline playlist browsing
+      // Optional enrichment: refresh channel feed & cache thumbnails (kept separate from core readiness)
       let thumbUrls = KUMUDINI_SEED_VIDEOS.map(v => v.thumbnailUrl);
 
       if (typeof navigator !== 'undefined' && navigator.onLine) {
         try {
           const controller = new AbortController();
-          const timer = window.setTimeout(() => controller.abort(), 5000);
+          const timer = globalThis.setTimeout(() => controller.abort(), 5000);
           const feedRes = await fetch('/api/youtube/kumudinidabade', { signal: controller.signal });
-          window.clearTimeout(timer);
+          globalThis.clearTimeout(timer);
           if (feedRes.ok) {
             await cache.put('/api/youtube/kumudinidabade', feedRes.clone());
             const json = await feedRes.json();
@@ -394,15 +460,16 @@ export async function prepareOfflineSevaApp(
             }
           }
         } catch {
-          // Offline or slow timeout — keep existing cached list
+          // Optional network refresh failed — core readiness unaffected
         }
       }
 
-      // Warm thumbnails (opaque no-cors is cacheable in Cache Storage)
+      const thumbsToWarm = thumbUrls.slice(0, 15);
+      totalThumbsAttempted = thumbsToWarm.length;
       await Promise.all(
-        thumbUrls.slice(0, 15).map(async thumbUrl => {
+        thumbsToWarm.map(async thumbUrl => {
           try {
-            const existing = await cache.match(thumbUrl);
+            const existing = (await cache.match(thumbUrl)) || (await caches.match(thumbUrl));
             if (existing) {
               cachedThumbsCount++;
               return;
@@ -416,31 +483,64 @@ export async function prepareOfflineSevaApp(
               }
             }
           } catch {
-            // ignore individual thumbnail errors
+            // Optional thumbnail caching error does not affect core readiness
           }
         })
       );
     } catch {
-      // Cache storage unavailable
+      cacheStorageAvailable = false;
+      missingCoreUrls.push(...coreUrls);
     }
+  } else {
+    missingCoreUrls.push(...coreUrls);
   }
 
-  const savedItems = await listOfflineMediaMeta();
-  const preparedAt = new Date().toISOString();
+  const [savedItems, vaultIntegrity] = await Promise.all([
+    listOfflineMediaMeta(),
+    verifyOfflineVaultIntegrity(),
+  ]);
+
+  let status: OfflineReadinessStatus;
+  if (!cacheStorageAvailable || cachedCoreCount === 0) {
+    status = 'failed';
+  } else if (swActive && cachedCoreCount === coreUrls.length && vaultIntegrity.unreadableCount === 0) {
+    status = 'ready';
+  } else {
+    status = 'partial';
+  }
+
+  const preparedAt = status === 'ready' ? new Date().toISOString() : null;
   try {
-    localStorage.setItem(PREPARED_AT_KEY, preparedAt);
+    localStorage.setItem(PREPARED_STATUS_KEY, status);
+    if (preparedAt) {
+      localStorage.setItem(PREPARED_AT_KEY, preparedAt);
+    } else {
+      localStorage.removeItem(PREPARED_AT_KEY);
+    }
   } catch {
     // ignore storage errors
   }
 
-  onProgress?.(100, 'done');
+  const finalPercent =
+    status === 'ready'
+      ? 100
+      : status === 'partial'
+      ? Math.max(25, Math.min(90, Math.round((cachedCoreCount / coreUrls.length) * 85)))
+      : 0;
+  onProgress?.(finalPercent, 'done');
 
   return {
+    status,
     swActive,
+    cacheStorageAvailable,
     cachedCoreCount,
     totalCoreCount: coreUrls.length,
+    missingCoreUrls,
     cachedThumbsCount,
+    totalThumbsAttempted,
     savedSongsCount: savedItems.length,
+    verifiedVaultCount: vaultIntegrity.verifiedCount,
+    unreadableVaultCount: vaultIntegrity.unreadableCount,
     preparedAt,
     isPersisted,
   };

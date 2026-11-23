@@ -1,4 +1,4 @@
-import { DayData } from '../types/calendar';
+import type { DayData } from '../types/calendar';
 import { getTodayDateInfo } from './calendarLogic';
 import { playBellChime } from './audioChime';
 import { ENGLISH_DAYS } from './translations';
@@ -7,19 +7,87 @@ export interface NotificationSettings {
   enabled: boolean;
   time: string; // '06:00', '05:30', '07:00', '08:00'
   soundEnabled: boolean;
-  lastNotifiedDate?: string; // 'YYYY-MM-DD'
+  language?: 'mr' | 'en';
+  lastNotifiedDate?: string; // 'YYYY-MM-DD' (local date)
   backgroundSyncEnabled?: boolean;
 }
 
+export interface NotificationCapabilities {
+  notificationsApi: boolean;
+  permission: NotificationPermission;
+  serviceWorker: boolean;
+  periodicSync: boolean;
+  timestampTrigger: boolean;
+}
+
 const SETTINGS_KEY = 'swami_daily_notif_settings';
+const NOTIF_PREFS_DB = 'swami_notif_prefs_v1';
+const NOTIF_PREFS_STORE = 'prefs';
+const NOTIF_PREFS_KEY = 'daily';
 
 export const DEFAULT_NOTIF_SETTINGS: NotificationSettings = {
   enabled: true,
   time: '06:00',
   soundEnabled: true,
+  language: 'mr',
   lastNotifiedDate: undefined,
   backgroundSyncEnabled: true,
 };
+
+function getLocalDateKey(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+async function syncNotificationPrefsToWorkerStore(settings: NotificationSettings): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  const payload = {
+    enabled: Boolean(settings.enabled),
+    time: settings.time || '06:00',
+    language: settings.language === 'en' ? 'en' : 'mr',
+    lastNotifiedDate: settings.lastNotifiedDate || null,
+  };
+
+  if (typeof indexedDB !== 'undefined') {
+    try {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open(NOTIF_PREFS_DB, 1);
+        req.onupgradeneeded = () => {
+          const database = req.result;
+          if (!database.objectStoreNames.contains(NOTIF_PREFS_STORE)) {
+            database.createObjectStore(NOTIF_PREFS_STORE);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(NOTIF_PREFS_STORE, 'readwrite');
+        tx.objectStore(NOTIF_PREFS_STORE).put(payload, NOTIF_PREFS_KEY);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    } catch {
+      // Fallback to SW message below
+    }
+  }
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg?.active) {
+        reg.active.postMessage({ type: 'SYNC_NOTIF_PREFS', prefs: payload });
+      }
+    }
+  } catch {
+    // ignore SW messaging errors
+  }
+}
 
 export function getNotificationSettings(): NotificationSettings {
   if (typeof window === 'undefined') return DEFAULT_NOTIF_SETTINGS;
@@ -39,10 +107,54 @@ export function saveNotificationSettings(settings: NotificationSettings): void {
   } catch (e) {
     console.error('Failed to save notification settings', e);
   }
+  void syncNotificationPrefsToWorkerStore(settings);
+}
+
+/**
+ * Reports actual notification and background scheduling capabilities available on this device/browser.
+ */
+export async function getNotificationCapabilities(): Promise<NotificationCapabilities> {
+  if (typeof window === 'undefined') {
+    return {
+      notificationsApi: false,
+      permission: 'denied',
+      serviceWorker: false,
+      periodicSync: false,
+      timestampTrigger: false,
+    };
+  }
+
+  const notificationsApi = 'Notification' in window;
+  const permission: NotificationPermission = notificationsApi ? Notification.permission : 'denied';
+  const serviceWorker = 'serviceWorker' in navigator;
+  let periodicSync = false;
+
+  if (serviceWorker) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      periodicSync = Boolean(reg && 'periodicSync' in reg);
+    } catch {
+      periodicSync = false;
+    }
+  }
+
+  const timestampTrigger =
+    notificationsApi &&
+    'showTrigger' in Notification.prototype &&
+    typeof (window as unknown as { TimestampTrigger?: unknown }).TimestampTrigger !== 'undefined';
+
+  return {
+    notificationsApi,
+    permission,
+    serviceWorker,
+    periodicSync,
+    timestampTrigger,
+  };
 }
 
 /**
  * Generates the notification title and message based on the day's special events.
+ * Marks estimated (non-2026) Panchang dates clearly so users are never misled.
  */
 export function buildTodayNotificationMessage(day: DayData, lang: 'mr' | 'en' = 'mr'): {
   title: string;
@@ -55,6 +167,8 @@ export function buildTodayNotificationMessage(day: DayData, lang: 'mr' | 'en' = 
   const isPournima = day.isPournima;
   const isAmavasya = day.isAmavasya;
   const hasFestivals = day.festivals.length > 0;
+  const estSuffixMr = day.isEstimated ? ' (अंदाजित पंचांग)' : '';
+  const estSuffixEn = day.isEstimated ? ' (Estimated Panchang)' : '';
 
   if (lang === 'mr') {
     let title = '॥ श्री स्वामी समर्थ ॥ जयसिंगपूर सेवा केंद्र';
@@ -62,28 +176,28 @@ export function buildTodayNotificationMessage(day: DayData, lang: 'mr' | 'en' = 
 
     if (isSankashti) {
       const moon = day.moonriseTime ? ` (चंद्रोदय: ${day.moonriseTime})` : '';
-      title = '🔴 आज संकष्टी चतुर्थी आहे!';
+      title = `🔴 आज संकष्टी चतुर्थी आहे!${estSuffixMr}`;
       body = `आज पावन संकष्टी चतुर्थी उपवास${moon}. संकटनाशन गणेश स्तोत्र व श्री स्वामी समर्थ नामस्मरण करा.`;
     } else if (isSwamiSpecial) {
       const festTitle = hasFestivals ? day.festivals[0].title : 'विशेष पर्व';
-      title = `🕉️ आज स्वामी विशेष पर्व: ${festTitle}`;
+      title = `🕉️ आज स्वामी विशेष पर्व: ${festTitle}${estSuffixMr}`;
       body = `आज श्री स्वामी समर्थ महाराजांचा पावन दिन! तारक मंत्र व नामजप करावा. आम्ही गेलो नाही, जिवंतचि आहोत!`;
     } else if (isEkadashi) {
       const ekaName = hasFestivals ? day.festivals[0].title : 'एकादशी उपवास';
-      title = `🟣 आज पवित्र ${ekaName} आहे!`;
+      title = `🟣 आज पवित्र ${ekaName} आहे!${estSuffixMr}`;
       body = `आज सर्व पापांचे क्षालन करणारी एकादशी. उपवास, विष्णू सहस्रनाम व स्वामी नामस्मरण करा.`;
     } else if (isPournima) {
       const pTitle = hasFestivals ? day.festivals[0].title : 'पौर्णिमा';
-      title = `🌕 आज ${pTitle} आहे!`;
+      title = `🌕 आज ${pTitle} आहे!${estSuffixMr}`;
       body = `आज सत्यनारायण पूजा व दीपपूजनाचा शुभ दिवस. श्री स्वामी समर्थ पादुका नमन करा.`;
     } else if (isAmavasya) {
-      title = `🌑 आज दर्श अमावास्या आहे!`;
+      title = `🌑 आज दर्श अमावास्या आहे!${estSuffixMr}`;
       body = `आज सायंकाळी दिवे लावा व कुलदैवताचे नामस्मरण करा. स्वामी कृपा सदैव पाठीशी राहो.`;
     } else if (hasFestivals) {
-      title = `✨ आजचा सण: ${day.festivals[0].title}`;
+      title = `✨ आजचा सण: ${day.festivals[0].title}${estSuffixMr}`;
       body = `${day.festivals[0].description} तिथी: ${day.tithi}, ${day.paksha} पक्ष. ॥ श्री स्वामी समर्थ ॥`;
     } else {
-      title = `🌸 शुभ प्रभात! आजची तिथी: ${day.tithi}`;
+      title = `🌸 शुभ प्रभात! आजची तिथी: ${day.tithi}${estSuffixMr}`;
       body = `आज ${day.marathiDayName}, ${day.paksha} पक्ष. "भिऊ नकोस मी तुझ्या पाठीशी आहे." ॥ श्री स्वामी समर्थ ॥`;
     }
 
@@ -94,27 +208,27 @@ export function buildTodayNotificationMessage(day: DayData, lang: 'mr' | 'en' = 
 
     if (isSankashti) {
       const moon = day.moonriseTime ? ` (Moonrise: ${day.moonriseTime})` : '';
-      title = '🔴 Today is Sankashti Chaturthi!';
+      title = `🔴 Today is Sankashti Chaturthi!${estSuffixEn}`;
       body = `Auspicious Sankashti fasting today${moon}. Recite Sankatnashan Ganesh Stotra and chant Shree Swami Samarth.`;
     } else if (isSwamiSpecial) {
       const festTitle = hasFestivals ? day.festivals[0].titleEn : 'Swami Special Day';
-      title = `🕉️ Swami Special: ${festTitle}`;
+      title = `🕉️ Swami Special: ${festTitle}${estSuffixEn}`;
       body = `A deeply auspicious day dedicated to Shree Swami Samarth Maharaj. Recite Tarak Mantra & 108 Japa.`;
     } else if (isEkadashi) {
       const ekaName = hasFestivals ? day.festivals[0].titleEn : 'Ekadashi Vrat';
-      title = `🟣 Today is Sacred ${ekaName}!`;
+      title = `🟣 Today is Sacred ${ekaName}!${estSuffixEn}`;
       body = `Fasting & prayers today. Chant the holy names of Lord Vishnu and Swami Maharaj.`;
     } else if (isPournima) {
-      title = `🌕 Today is Pournima (Full Moon)!`;
+      title = `🌕 Today is Pournima (Full Moon)!${estSuffixEn}`;
       body = `Satyanarayan worship & holy prayers. May divine grace illuminate your home.`;
     } else if (isAmavasya) {
-      title = `🌑 Today is Amavasya (New Moon)!`;
+      title = `🌑 Today is Amavasya (New Moon)!${estSuffixEn}`;
       body = `Offer evening prayers and remembrance of ancestral lineage. May Swami bless your day.`;
     } else if (hasFestivals) {
-      title = `✨ Today: ${day.festivals[0].titleEn}`;
+      title = `✨ Today: ${day.festivals[0].titleEn}${estSuffixEn}`;
       body = `${day.festivals[0].description} Tithi: ${day.tithi}, ${day.paksha} Paksha.`;
     } else {
-      title = `🌸 Good Morning! Tithi: ${day.tithi}`;
+      title = `🌸 Good Morning! Tithi: ${day.tithi}${estSuffixEn}`;
       const dayName = ENGLISH_DAYS[day.dayOfWeek] || '';
       body = `Today is ${dayName}, ${day.paksha} Paksha. "Fear not, I am always with you." ॥ Shree Swami Samarth ॥`;
     }
@@ -123,33 +237,26 @@ export function buildTodayNotificationMessage(day: DayData, lang: 'mr' | 'en' = 
   }
 }
 
-/**
- * Checks if browser supports Notifications API
- */
 export function isNotificationSupported(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
-/**
- * Gets current notification permission
- */
 export function getNotificationPermission(): NotificationPermission {
   if (!isNotificationSupported()) return 'denied';
   return Notification.permission;
 }
 
-/**
- * Requests notification permission from user
- */
-export async function requestNotificationPermission(): Promise<NotificationPermission> {
+export async function requestNotificationPermission(lang: 'mr' | 'en' = 'mr'): Promise<NotificationPermission> {
   if (!isNotificationSupported()) return 'denied';
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      // Auto-register background sync and alarms
-      registerPeriodicDailySync();
-      const settings = getNotificationSettings();
-      scheduleFutureDailyAlarms(7, settings.time, 'mr');
+      const settings = { ...getNotificationSettings(), language: lang };
+      saveNotificationSettings(settings);
+      if (settings.enabled) {
+        await registerPeriodicDailySync();
+        await scheduleFutureDailyAlarms(7, settings.time, lang);
+      }
     }
     return permission;
   } catch (e) {
@@ -158,9 +265,6 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   }
 }
 
-/**
- * Sends a notification immediately (using service worker if available, falling back to Notification constructor)
- */
 export async function sendDailyNotification(
   dayData?: DayData,
   lang: 'mr' | 'en' = 'mr',
@@ -170,7 +274,7 @@ export async function sendDailyNotification(
 
   const permission = Notification.permission;
   if (permission !== 'granted') {
-    const requested = await requestNotificationPermission();
+    const requested = await requestNotificationPermission(lang);
     if (requested !== 'granted') return false;
   }
 
@@ -181,12 +285,11 @@ export async function sendDailyNotification(
     try {
       playBellChime();
     } catch {
-      // Audio might be blocked if without user interaction
+      // Audio might be blocked without user interaction
     }
   }
 
   try {
-    // Try via ServiceWorkerRegistration first (standard PWA recommendation)
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.ready;
       if (registration && 'showNotification' in registration) {
@@ -205,7 +308,6 @@ export async function sendDailyNotification(
       }
     }
 
-    // Fallback to standard window Notification
     new Notification(title, {
       body,
       icon: badgeIcon,
@@ -225,22 +327,25 @@ export async function sendDailyNotification(
 }
 
 /**
- * Registers Periodic Background Sync so the Android OS wakes up the Service Worker
- * even when the PWA is closed!
+ * Registers Periodic Background Sync where supported by the browser (best-effort).
  */
 export async function registerPeriodicDailySync(): Promise<boolean> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
   try {
     const registration = await navigator.serviceWorker.ready;
     if ('periodicSync' in registration) {
-      const periodicSync = (registration as any).periodicSync;
-      try {
-        await periodicSync.register('daily-darshan-sync', {
-          minInterval: 12 * 60 * 60 * 1000, // 12 hours interval for morning notification
-        });
-        return true;
-      } catch (err) {
-        console.warn('Periodic sync register fallback:', err);
+      const periodicSync = (registration as unknown as {
+        periodicSync?: { register: (tag: string, opts: { minInterval: number }) => Promise<void> };
+      }).periodicSync;
+      if (periodicSync) {
+        try {
+          await periodicSync.register('daily-darshan-sync', {
+            minInterval: 12 * 60 * 60 * 1000,
+          });
+          return true;
+        } catch (err) {
+          console.warn('Periodic sync register fallback:', err);
+        }
       }
     }
   } catch (e) {
@@ -250,8 +355,29 @@ export async function registerPeriodicDailySync(): Promise<boolean> {
 }
 
 /**
- * Schedules future daily morning alarms (using Notification Triggers API / TimestampTrigger)
- * so Android triggers the notifications at the specified time even if the app is closed!
+ * Unregisters Periodic Background Sync when the user disables daily notifications.
+ */
+export async function unregisterPeriodicDailySync(): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (registration && 'periodicSync' in registration) {
+      const periodicSync = (registration as unknown as {
+        periodicSync?: { unregister: (tag: string) => Promise<void> };
+      }).periodicSync;
+      if (periodicSync) {
+        await periodicSync.unregister('daily-darshan-sync');
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('Periodic sync unregister error:', e);
+  }
+  return false;
+}
+
+/**
+ * Best-effort future daily notification scheduling where TimestampTrigger is supported.
  */
 export async function scheduleFutureDailyAlarms(
   daysAhead = 7,
@@ -270,7 +396,7 @@ export async function scheduleFutureDailyAlarms(
       targetDate.setDate(now.getDate() + i);
       targetDate.setHours(hours, minutes, 0, 0);
 
-      const dateStr = targetDate.toISOString().split('T')[0];
+      const dateStr = getLocalDateKey(targetDate);
       const title =
         lang === 'mr'
           ? '॥ श्री स्वामी समर्थ ॥ शुभ प्रभात'
@@ -280,9 +406,10 @@ export async function scheduleFutureDailyAlarms(
           ? 'आजचे पंचांग व नित्यसेवा स्मरण. "भिऊ नकोस मी तुझ्या पाठीशी आहे."'
           : "Today's Panchang & Nitya Seva. \"Fear not, I am with you.\"";
 
-      // Check if browser supports TimestampTrigger
-      const TimestampTriggerClass = (window as any).TimestampTrigger;
-      if ('showTrigger' in Notification.prototype && TimestampTriggerClass) {
+      const TimestampTriggerClass = (window as unknown as {
+        TimestampTrigger?: new (ts: number) => unknown;
+      }).TimestampTrigger;
+      if ('Notification' in window && 'showTrigger' in Notification.prototype && TimestampTriggerClass) {
         try {
           await registration.showNotification(title, {
             body,
@@ -291,22 +418,11 @@ export async function scheduleFutureDailyAlarms(
             tag: `swami-alarm-${dateStr}`,
             showTrigger: new TimestampTriggerClass(targetDate.getTime()),
             data: { url: '/', date: dateStr },
-          } as any);
+          } as NotificationOptions);
           count++;
         } catch (e) {
           console.warn('TimestampTrigger register failed for date:', dateStr, e);
         }
-      }
-
-      // Notify service worker of schedule
-      if (registration.active) {
-        registration.active.postMessage({
-          type: 'SCHEDULE_DAY_ALARM',
-          title,
-          body,
-          timestamp: targetDate.getTime(),
-          tag: `swami-alarm-${dateStr}`,
-        });
       }
     }
 
@@ -317,10 +433,6 @@ export async function scheduleFutureDailyAlarms(
   }
 }
 
-/**
- * Sends a delayed background test notification through the Service Worker
- * so the user can close the app and verify the notification pops up!
- */
 export async function testBackgroundNotification(
   delaySeconds = 5,
   lang: 'mr' | 'en' = 'mr'
@@ -334,8 +446,8 @@ export async function testBackgroundNotification(
         : '॥ Shree Swami Samarth ॥ Test Alert';
     const body =
       lang === 'mr'
-        ? 'अॅप बंद असतानाही ही सूचना यशस्वीरीत्या आली! "भिऊ नकोस मी तुझ्या पाठीशी आहे."'
-        : 'Notification received successfully even with app closed! "Fear not, I am with you."';
+        ? 'सेवा केंद्राची चाचणी सूचना यशस्वीरीत्या आली! "भिऊ नकोस मी तुझ्या पाठीशी आहे."'
+        : 'Test alert received successfully! "Fear not, I am with you."';
 
     if (registration.active) {
       registration.active.postMessage({
@@ -353,24 +465,28 @@ export async function testBackgroundNotification(
 }
 
 /**
- * Initializes the background scheduler and registers periodic sync and upcoming alarms.
+ * Initializes the daily notification scheduler and syncs preferences with the Service Worker.
  */
 export function initDailyNotificationScheduler(lang: 'mr' | 'en' = 'mr'): () => void {
   if (typeof window === 'undefined') return () => {};
 
-  // Setup periodic sync and future alarms on startup
-  if ('serviceWorker' in navigator && Notification.permission === 'granted') {
-    registerPeriodicDailySync();
-    const settings = getNotificationSettings();
-    if (settings.enabled) {
-      scheduleFutureDailyAlarms(7, settings.time, lang);
+  const initialSettings = getNotificationSettings();
+  const syncedSettings: NotificationSettings = { ...initialSettings, language: lang };
+  void syncNotificationPrefsToWorkerStore(syncedSettings);
+
+  if ('serviceWorker' in navigator && isNotificationSupported() && Notification.permission === 'granted') {
+    if (syncedSettings.enabled) {
+      void registerPeriodicDailySync();
+      void scheduleFutureDailyAlarms(7, syncedSettings.time, lang);
+    } else {
+      void unregisterPeriodicDailySync();
     }
   }
 
   const checkAndTrigger = () => {
     const settings = getNotificationSettings();
     if (!settings.enabled) return;
-    if (Notification.permission !== 'granted') return;
+    if (!isNotificationSupported() || Notification.permission !== 'granted') return;
 
     const now = new Date();
     const [targetHour, targetMinute] = settings.time.split(':').map(Number);
@@ -378,22 +494,20 @@ export function initDailyNotificationScheduler(lang: 'mr' | 'en' = 'mr'): () => 
       now.getHours() > targetHour ||
       (now.getHours() === targetHour && now.getMinutes() >= targetMinute);
 
-    const todayDateStr = getTodayDateInfo().dateStr;
+    const todayDateStr = getLocalDateKey(now);
 
-    // If it's on or after target time (e.g. 6 AM) and hasn't notified today yet
     if (isPastTargetTime && settings.lastNotifiedDate !== todayDateStr) {
-      sendDailyNotification(undefined, lang, settings.soundEnabled);
+      void sendDailyNotification(undefined, lang, settings.soundEnabled);
       saveNotificationSettings({
         ...settings,
+        language: lang,
         lastNotifiedDate: todayDateStr,
       });
     }
   };
 
-  // Run initial check
   checkAndTrigger();
 
-  // Check every 60 seconds while open
   const intervalId = window.setInterval(checkAndTrigger, 60000);
 
   return () => {
@@ -477,7 +591,7 @@ export async function sendTimerAlertNotification(
       badge: '/pwa-192x192.png',
     });
     return true;
-  } catch (err) {
+  } catch {
     try {
       new Notification(title, { body });
       return true;

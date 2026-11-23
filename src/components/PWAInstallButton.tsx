@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useLanguage } from '../context/LanguageContext';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { Download, Share2, PlusSquare, X, Smartphone, CheckCircle2 } from 'lucide-react';
 
 export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
@@ -9,11 +10,14 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
+  const iosDialogRef = useDialogA11y(showIOSGuide, () => setShowIOSGuide(false));
+  const helpDialogRef = useDialogA11y(showHelpModal, () => setShowHelpModal(false));
+
   // If already installed and running as standalone, show verified badge
   if (isInstalled) {
     return (
       <div
-        className="flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-xl bg-emerald-500/15 text-emerald-700 text-xs font-semibold border border-emerald-500/30"
+        className="flex items-center gap-1 px-2 py-1.5 min-h-[36px] rounded-xl bg-emerald-500/15 text-emerald-700 text-xs font-semibold border border-emerald-500/30"
         title={t('appInstalled')}
       >
         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -26,14 +30,15 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
   if (isInstallable) {
     return (
       <button
+        type="button"
         onClick={install}
         aria-label={t('installAppPWA')}
         title={t('installAppPWA')}
         className={`flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 font-bold text-white shadow-sm shadow-orange-500/25 hover:from-orange-700 hover:to-amber-700 active:scale-95 transition-all duration-150 ${
-          compact ? 'p-1.5 sm:px-2.5 sm:py-1.5 text-xs' : 'px-4 py-2 text-sm'
+          compact ? 'min-w-[44px] min-h-[44px] px-2 sm:px-3 text-xs' : 'min-h-[44px] px-4 py-2 text-sm'
         }`}
       >
-        <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 animate-bounce" />
+        <Download className="w-4 h-4 shrink-0" />
         <span className={compact ? 'hidden sm:inline' : 'inline'}>{t('installApp')}</span>
       </button>
     );
@@ -44,37 +49,46 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
     return (
       <>
         <button
+          type="button"
           onClick={() => setShowIOSGuide(true)}
           aria-label={t('saveOnIOS')}
           title={t('saveOnIOS')}
           className={`flex items-center justify-center gap-1.5 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-100 font-bold hover:bg-orange-500/20 active:scale-95 transition-all duration-150 ${
-            compact ? 'p-1.5 sm:px-2.5 sm:py-1.5 text-xs' : 'px-3 py-2 text-sm'
+            compact ? 'min-w-[44px] min-h-[44px] px-2 sm:px-3 text-xs' : 'min-h-[44px] px-3 py-2 text-sm'
           }`}
         >
-          <Smartphone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300 shrink-0" />
+          <Smartphone className="w-4 h-4 text-amber-300 shrink-0" />
           <span className={compact ? 'hidden sm:inline' : 'inline'}>{t('saveOnIOS')}</span>
         </button>
 
         {showIOSGuide && (
           <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
             role="dialog"
             aria-modal="true"
             aria-labelledby="ios-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowIOSGuide(false);
+            }}
           >
-            <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-orange-100 text-slate-800">
-              <div className="flex items-center justify-between pb-3 border-b border-orange-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm">
+            <div
+              ref={iosDialogRef}
+              tabIndex={-1}
+              className="w-full max-w-sm max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-orange-100 text-slate-800 focus:outline-none"
+            >
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-orange-100">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 shrink-0 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm">
                     iOS
                   </div>
-                  <h3 id="ios-modal-title" className="text-base font-bold text-orange-950">
+                  <h3 id="ios-modal-title" className="text-base font-bold text-orange-950 leading-snug">
                     {language === 'en' ? 'Install on iPhone / iPad' : 'iPhone / iPad वर ॲप इन्स्टॉल करा'}
                   </h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowIOSGuide(false)}
-                  className="rounded-full p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  className="min-w-[44px] min-h-[44px] shrink-0 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-100"
                   aria-label={t('close')}
                 >
                   <X className="w-5 h-5" />
@@ -136,8 +150,9 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
               </div>
 
               <button
+                type="button"
                 onClick={() => setShowIOSGuide(false)}
-                className="mt-5 w-full rounded-2xl bg-gradient-to-r from-orange-600 to-amber-600 py-3 text-sm font-bold text-white shadow-md shadow-orange-600/20 hover:from-orange-700 hover:to-amber-700 active:scale-98 transition"
+                className="mt-5 w-full min-h-[44px] rounded-2xl bg-gradient-to-r from-orange-600 to-amber-600 py-3 text-sm font-bold text-white shadow-md shadow-orange-600/20 hover:from-orange-700 hover:to-amber-700 active:scale-98 transition"
               >
                 {t('close')}
               </button>
@@ -152,31 +167,41 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
   return (
     <>
       <button
+        type="button"
         onClick={() => setShowHelpModal(true)}
         aria-label={t('installApp')}
         title={t('installApp')}
         className={`flex items-center justify-center gap-1.5 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-100 font-bold hover:bg-orange-500/20 active:scale-95 transition-all duration-150 ${
-          compact ? 'p-1.5 sm:px-2.5 sm:py-1.5 text-xs' : 'px-3 py-2 text-sm'
+          compact ? 'min-w-[44px] min-h-[44px] px-2 sm:px-3 text-xs' : 'min-h-[44px] px-3 py-2 text-sm'
         }`}
       >
-        <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
+        <Download className="w-4 h-4 text-amber-300 shrink-0" />
         <span className={compact ? 'hidden sm:inline' : 'inline'}>{t('installApp')}</span>
       </button>
 
       {showHelpModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
+          aria-labelledby="install-help-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowHelpModal(false);
+          }}
         >
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-orange-100 text-slate-800">
-            <div className="flex items-center justify-between pb-3 border-b border-orange-100">
-              <h3 className="text-base font-bold text-orange-950">
+          <div
+            ref={helpDialogRef}
+            tabIndex={-1}
+            className="w-full max-w-sm max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-orange-100 text-slate-800 focus:outline-none"
+          >
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-orange-100">
+              <h3 id="install-help-modal-title" className="text-base font-bold text-orange-950 leading-snug">
                 {language === 'en' ? 'Install on Mobile & Computer' : 'मोबाईल व कॉम्प्युटरवर इन्स्टॉल करा'}
               </h3>
               <button
+                type="button"
                 onClick={() => setShowHelpModal(false)}
-                className="rounded-full p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="min-w-[44px] min-h-[44px] shrink-0 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-100"
                 aria-label={t('close')}
               >
                 <X className="w-5 h-5" />
@@ -194,8 +219,9 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
               </p>
             </div>
             <button
+              type="button"
               onClick={() => setShowHelpModal(false)}
-              className="mt-5 w-full rounded-2xl bg-orange-600 py-2.5 text-sm font-bold text-white hover:bg-orange-700 transition"
+              className="mt-5 w-full min-h-[44px] rounded-2xl bg-orange-600 py-2.5 text-sm font-bold text-white hover:bg-orange-700 transition"
             >
               {t('close')}
             </button>

@@ -347,17 +347,18 @@ export const SaramrutView: React.FC = () => {
 
     return (
       <div ref={readerTopRef} className="space-y-3 pb-4">
-        {/* Compact Sticky Reader Bar (stays minimal to preserve reading canvas) */}
+        {/* Compact Sticky Reader Bar (dynamically anchored to measured Header height — zero overlap/gap) */}
         <div
-          className={`sticky top-[56px] sm:top-[64px] z-20 -mx-3 sm:-mx-4 px-3 sm:px-4 border-b backdrop-blur-md transition-colors ${theme.topBar}`}
+          className={`sticky top-[var(--app-header-height,3.75rem)] z-20 rounded-2xl px-3 sm:px-4 border shadow-xs backdrop-blur-md transition-colors ${theme.topBar}`}
         >
-          <div className="flex items-center justify-between gap-2 h-12">
+          <div className="flex items-center justify-between gap-2 min-h-[48px] py-1">
             <button
+              type="button"
               onClick={() => {
                 setShowAppearanceMenu(false);
                 setActiveAdhyayId(null);
               }}
-              className={`min-h-[40px] px-2.5 -ml-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold transition active:scale-95 whitespace-nowrap shrink-0 ${theme.btnNeutral}`}
+              className={`min-h-[44px] px-2.5 -ml-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold transition active:scale-95 whitespace-nowrap shrink-0 ${theme.btnNeutral}`}
               aria-label={t('saramrutBackToList')}
             >
               <ArrowLeft className="w-4 h-4 shrink-0" />
@@ -372,8 +373,9 @@ export const SaramrutView: React.FC = () => {
 
             <div className="flex items-center gap-1 shrink-0">
               <button
+                type="button"
                 onClick={() => toggleBookmark(activeAdhyay.id)}
-                className={`min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center transition active:scale-95 ${
+                className={`min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center transition active:scale-95 ${
                   isBookmarked
                     ? 'bg-orange-600 text-white'
                     : theme.btnNeutral
@@ -385,8 +387,9 @@ export const SaramrutView: React.FC = () => {
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowAppearanceMenu(prev => !prev)}
-                className={`min-h-[40px] min-w-[40px] px-2 rounded-xl flex items-center justify-center gap-1 text-xs font-black transition active:scale-95 ${
+                className={`min-h-[44px] min-w-[44px] px-2.5 rounded-xl flex items-center justify-center gap-1 text-xs font-black transition active:scale-95 ${
                   showAppearanceMenu ? 'bg-orange-600 text-white' : theme.btnNeutral
                 }`}
                 aria-label={t('saramrutFontSize')}
@@ -420,9 +423,10 @@ export const SaramrutView: React.FC = () => {
                 <div className="grid grid-cols-4 gap-1.5">
                   {(['sm', 'md', 'lg', 'xl'] as ReaderFontSize[]).map(sizeKey => (
                     <button
+                      type="button"
                       key={sizeKey}
                       onClick={() => setReaderPrefs(p => ({ ...p, fontSize: sizeKey }))}
-                      className={`min-h-[40px] rounded-xl font-black text-xs transition active:scale-95 ${
+                      className={`min-h-[44px] rounded-xl font-black text-xs transition active:scale-95 ${
                         readerPrefs.fontSize === sizeKey
                           ? 'bg-orange-600 text-white shadow-xs'
                           : theme.btnNeutral
@@ -434,44 +438,47 @@ export const SaramrutView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Theme Selector */}
+              {/* Theme Selector — always 3 tidy single-line buttons on 1 row */}
               <div className="space-y-1.5">
                 <span className={`block text-[11px] font-bold ${theme.muted}`}>{t('saramrutTheme')}</span>
                 <div className="grid grid-cols-3 gap-1.5">
                   <button
+                    type="button"
                     onClick={() => setReaderPrefs(p => ({ ...p, theme: 'parchment' }))}
-                    className={`min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition active:scale-95 whitespace-nowrap ${
+                    className={`min-h-[44px] px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition active:scale-95 whitespace-nowrap min-w-0 ${
                       readerPrefs.theme === 'parchment'
                         ? 'bg-[#FBF5E6] text-[#6B2608] border-orange-600 ring-1 ring-orange-600'
                         : 'bg-[#FBF5E6] text-[#4A2511] border-amber-300/70 opacity-80'
                     }`}
                   >
                     <ScrollText className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t('saramrutThemeParchment')}</span>
+                    <span className="truncate">{t('saramrutThemeParchment')}</span>
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setReaderPrefs(p => ({ ...p, theme: 'light' }))}
-                    className={`min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition active:scale-95 whitespace-nowrap ${
+                    className={`min-h-[44px] px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition active:scale-95 whitespace-nowrap min-w-0 ${
                       readerPrefs.theme === 'light'
                         ? 'bg-white text-slate-900 border-orange-600 ring-1 ring-orange-600'
                         : 'bg-white text-slate-700 border-slate-300 opacity-80'
                     }`}
                   >
                     <Sun className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t('saramrutThemeLight')}</span>
+                    <span className="truncate">{t('saramrutThemeLight')}</span>
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setReaderPrefs(p => ({ ...p, theme: 'night' }))}
-                    className={`min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition active:scale-95 whitespace-nowrap ${
+                    className={`min-h-[44px] px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition active:scale-95 whitespace-nowrap min-w-0 ${
                       readerPrefs.theme === 'night'
                         ? 'bg-[#1A1512] text-amber-300 border-amber-400 ring-1 ring-amber-400'
                         : 'bg-[#1A1512] text-[#E6D8C3] border-stone-700 opacity-85'
                     }`}
                   >
                     <Moon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t('saramrutThemeNight')}</span>
+                    <span className="truncate">{t('saramrutThemeNight')}</span>
                   </button>
                 </div>
               </div>
@@ -570,10 +577,18 @@ export const SaramrutView: React.FC = () => {
               </p>
             </div>
 
-            {/* Mark Complete Primary Action */}
+            {/* Mark Complete Primary Action — crisp single-line label */}
             <button
+              type="button"
               onClick={() => toggleCompleted(activeAdhyay.id)}
-              className={`w-full min-h-[48px] px-4 py-3 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-xs ${
+              title={
+                isCompleted
+                  ? language === 'mr'
+                    ? 'बदलण्यासाठी टॅप करा'
+                    : 'Tap to undo'
+                  : undefined
+              }
+              className={`w-full min-h-[48px] px-4 py-3 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-xs whitespace-nowrap ${
                 isCompleted
                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                   : 'bg-orange-600 hover:bg-orange-700 text-white'
@@ -582,16 +597,16 @@ export const SaramrutView: React.FC = () => {
               {isCompleted ? (
                 <>
                   <CheckCircle2 className="w-5 h-5 shrink-0" />
-                  <span>
+                  <span className="truncate">
                     {language === 'mr'
-                      ? `${activeAdhyay.titleMr} पूर्ण झाले (बदलण्यासाठी टॅप करा)`
-                      : `${activeAdhyay.titleEn} Completed (Tap to Undo)`}
+                      ? `${activeAdhyay.titleMr} पूर्ण झाले ✓`
+                      : `${activeAdhyay.titleEn} Completed ✓`}
                   </span>
                 </>
               ) : (
                 <>
                   <Check className="w-5 h-5 shrink-0" />
-                  <span>{t('saramrutMarkComplete')}</span>
+                  <span className="truncate">{t('saramrutMarkComplete')}</span>
                 </>
               )}
             </button>
@@ -728,12 +743,12 @@ export const SaramrutView: React.FC = () => {
 
       {/* 2. Parayan Sankalp Tracker Card (3-Day / 7-Day / 21-Day) */}
       <div className="rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-5 border border-orange-200/80 shadow-xs space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="text-sm sm:text-base font-black text-orange-950">
+        <div className="flex items-center justify-between flex-nowrap gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm sm:text-base font-black text-orange-950 truncate">
               {t('saramrutParayanTitle')}
             </h2>
-            <p className="text-xs text-slate-500 font-medium tabular-nums mt-0.5">
+            <p className="text-xs text-slate-500 font-medium tabular-nums mt-0.5 truncate">
               {language === 'mr'
                 ? `${toMarathiDigits(completedAdhyays.length)} / २१ अध्याय पूर्ण · ${toMarathiDigits(progressPercent)}%`
                 : `${completedAdhyays.length} / 21 Adhyays completed · ${progressPercent}%`}
@@ -742,10 +757,11 @@ export const SaramrutView: React.FC = () => {
 
           {completedAdhyays.length > 0 && (
             <button
+              type="button"
               onClick={() => setShowResetConfirm(prev => !prev)}
-              className="min-h-[38px] px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-600 flex items-center gap-1 transition whitespace-nowrap shrink-0"
+              className="min-h-[40px] px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-600 flex items-center gap-1 transition whitespace-nowrap shrink-0"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3.5 h-3.5 shrink-0" />
               <span>{t('reset')}</span>
             </button>
           )}
@@ -820,8 +836,8 @@ export const SaramrutView: React.FC = () => {
             <span>{t('saramrutParayanDone')}</span>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
-            <div className="min-w-0">
+          <div className="flex items-center justify-between flex-nowrap gap-2 pt-0.5 text-xs">
+            <div className="min-w-0 flex-1 truncate whitespace-nowrap">
               <span className="text-slate-500 font-medium">
                 {language === 'mr' ? 'पुढील लक्ष्य: ' : 'Current Target: '}
               </span>
@@ -841,11 +857,12 @@ export const SaramrutView: React.FC = () => {
             </div>
 
             <button
+              type="button"
               onClick={() => setShowScheduleDays(prev => !prev)}
-              className="min-h-[36px] px-2.5 py-1 rounded-lg text-orange-700 hover:bg-orange-50 font-bold flex items-center gap-1 whitespace-nowrap shrink-0 transition"
+              className="min-h-[40px] px-2.5 py-1 rounded-lg text-orange-700 hover:bg-orange-50 font-bold flex items-center gap-1 whitespace-nowrap shrink-0 transition"
             >
               <span>{language === 'mr' ? 'वेळापत्रक' : 'Schedule'}</span>
-              {showScheduleDays ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showScheduleDays ? <ChevronUp className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
             </button>
           </div>
         )}
@@ -902,13 +919,14 @@ export const SaramrutView: React.FC = () => {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={t('saramrutSearchPlaceholder')}
-            className="w-full min-h-[44px] pl-10 pr-10 py-2 rounded-xl bg-amber-50/50 border border-orange-200/80 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition"
+            className="w-full min-h-[44px] pl-10 pr-10 py-2 rounded-xl bg-amber-50/50 border border-orange-200/80 text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-orange-500 focus:bg-white transition"
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery('')}
               aria-label={t('saramrutClearSearch')}
-              className="absolute right-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700"
+              className="absolute right-1 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700"
             >
               <X className="w-4 h-4" />
             </button>
@@ -918,13 +936,14 @@ export const SaramrutView: React.FC = () => {
         {/* Toggleable 1-21 Quick Jump Grid */}
         <div className="space-y-2">
           <button
+            type="button"
             onClick={() => setShowQuickJump(prev => !prev)}
-            className="w-full flex items-center justify-between text-xs font-bold text-orange-950 py-0.5"
+            className="w-full min-h-[36px] flex items-center justify-between flex-nowrap gap-2 text-xs font-bold text-orange-950 py-0.5"
           >
-            <span>{t('saramrutQuickJump')}</span>
-            <span className="text-orange-700 flex items-center gap-1 text-[11px]">
+            <span className="truncate">{t('saramrutQuickJump')}</span>
+            <span className="text-orange-700 flex items-center gap-1 text-[11px] whitespace-nowrap shrink-0">
               <span>{showQuickJump ? (language === 'mr' ? 'लपवा' : 'Hide') : (language === 'mr' ? 'सर्व २१ पहा' : 'Show 1–21')}</span>
-              {showQuickJump ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showQuickJump ? <ChevronUp className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
             </span>
           </button>
 

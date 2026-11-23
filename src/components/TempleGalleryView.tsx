@@ -383,13 +383,13 @@ export const TempleGalleryView: React.FC = () => {
           </button>
         </div>
 
-        {/* Slideshow Controls Bar (Clean, Unclustered with One-Tap Download) */}
-        <div className="p-3 sm:p-3.5 bg-amber-50/50 border-t border-orange-100 flex items-center justify-between gap-1.5 sm:gap-2">
+        {/* Slideshow Controls Bar — crisp single non-wrapping row from 320px up */}
+        <div className="p-2.5 sm:p-3.5 bg-amber-50/50 border-t border-orange-100 flex items-center flex-nowrap gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={() => goPrev(true)}
             aria-label={t('galleryPrev')}
-            className="min-h-[42px] px-2.5 sm:px-3 py-2 rounded-xl bg-white hover:bg-orange-50 border border-orange-200 text-orange-950 text-xs font-bold flex items-center gap-1 transition active:scale-95 whitespace-nowrap shrink-0"
+            className="min-w-[44px] min-h-[44px] px-2 sm:px-3 py-2 rounded-xl bg-white hover:bg-orange-50 border border-orange-200 text-orange-950 text-xs font-bold flex items-center justify-center gap-1 transition active:scale-95 whitespace-nowrap shrink-0"
           >
             <ChevronLeft className="w-4 h-4 text-orange-700 shrink-0" />
             <span className="hidden sm:inline">{t('galleryPrev')}</span>
@@ -398,7 +398,7 @@ export const TempleGalleryView: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsAutoPlaying(prev => !prev)}
-            className={`flex-1 min-h-[42px] px-3 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap shadow-2xs ${
+            className={`flex-1 min-w-0 min-h-[44px] px-2.5 sm:px-3 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap shadow-2xs ${
               isAutoPlaying
                 ? 'bg-orange-700 hover:bg-orange-800 text-white'
                 : 'bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white'
@@ -407,14 +407,24 @@ export const TempleGalleryView: React.FC = () => {
             {isAutoPlaying ? (
               <>
                 <Pause className="w-3.5 h-3.5 fill-current shrink-0" />
-                <span>{t('galleryPauseSlideshow')}</span>
+                <span className="truncate">{t('galleryPauseSlideshow')}</span>
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-                <span>{t('galleryPlaySlideshow')}</span>
+                <span className="truncate">{t('galleryPlaySlideshow')}</span>
               </>
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => goNext(true)}
+            aria-label={t('galleryNext')}
+            className="min-w-[44px] min-h-[44px] px-2 sm:px-3 py-2 rounded-xl bg-white hover:bg-orange-50 border border-orange-200 text-orange-950 text-xs font-bold flex items-center justify-center gap-1 transition active:scale-95 whitespace-nowrap shrink-0"
+          >
+            <span className="hidden sm:inline">{t('galleryNext')}</span>
+            <ChevronRight className="w-4 h-4 text-orange-700 shrink-0" />
           </button>
 
           <button
@@ -423,39 +433,29 @@ export const TempleGalleryView: React.FC = () => {
             disabled={isDownloading}
             aria-label={t('galleryDownload')}
             title={t('galleryDownload')}
-            className="min-h-[42px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs transition active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-65"
+            className="min-w-[44px] min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs transition active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-65"
           >
             {isDownloading ? (
               <Loader2 className="w-4 h-4 animate-spin shrink-0" />
             ) : (
               <Download className="w-4 h-4 shrink-0" />
             )}
-            <span>{isDownloading ? t('galleryDownloading') : t('galleryDownload')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => goNext(true)}
-            aria-label={t('galleryNext')}
-            className="min-h-[42px] px-2.5 sm:px-3 py-2 rounded-xl bg-white hover:bg-orange-50 border border-orange-200 text-orange-950 text-xs font-bold flex items-center gap-1 transition active:scale-95 whitespace-nowrap shrink-0"
-          >
-            <span className="hidden sm:inline">{t('galleryNext')}</span>
-            <ChevronRight className="w-4 h-4 text-orange-700 shrink-0" />
+            <span className="hidden xs:inline">{isDownloading ? t('galleryDownloading') : t('galleryDownload')}</span>
           </button>
         </div>
       </section>
 
       {/* 2. Uncluttered Expandable Photo Grid */}
       <section className="rounded-2xl sm:rounded-3xl bg-white border border-orange-200/80 shadow-xs p-3.5 sm:p-4 space-y-3.5">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="min-w-0">
-            <h3 className="text-sm font-black text-orange-950">
+        <div className="flex items-center justify-between flex-nowrap gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-black text-orange-950 truncate">
               {t('galleryAllPhotosHeading')}
             </h3>
-            <p className="text-[11px] text-slate-500 font-medium tabular-nums mt-0.5">
+            <p className="text-[11px] text-slate-500 font-medium tabular-nums mt-0.5 truncate">
               {language === 'mr'
-                ? `एकूण ${toMarathiDigits(totalCount)} मंदिर फोटो · पाहण्यासाठी कोणत्याही फोटोवर टॅप करा`
-                : `${totalCount} temple photos · Tap any photo to view above`}
+                ? `एकूण ${toMarathiDigits(totalCount)} मंदिर फोटो · पाहण्यासाठी टॅप करा`
+                : `${totalCount} temple photos · Tap any photo to view`}
             </p>
           </div>
 
@@ -463,7 +463,7 @@ export const TempleGalleryView: React.FC = () => {
             type="button"
             onClick={() => fetchGalleryPhotos(true)}
             disabled={isRefreshing}
-            className="min-h-[38px] px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-950 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap disabled:opacity-60"
+            className="min-h-[40px] px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-950 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap shrink-0 disabled:opacity-60"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-orange-700 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>{isRefreshing ? t('gallerySyncing') : t('galleryRefresh')}</span>
@@ -549,16 +549,14 @@ export const TempleGalleryView: React.FC = () => {
       {/* 3. Direct Google Photos Album Link Card Below Gallery (View & Download Only) */}
       <section className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-amber-50 via-white to-orange-50 border border-orange-200/90 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-black text-orange-950 flex items-center gap-1.5">
-              <Images className="w-4 h-4 text-orange-600 shrink-0" />
-              <span>{t('galleryAlbumLinkTitle')}</span>
-            </h3>
-            <span className="text-[11px] font-bold text-emerald-700 inline-flex items-center gap-1">
-              <Eye className="w-3 h-3 shrink-0" />
-              <span>{t('galleryViewOnlyNote')}</span>
-            </span>
-          </div>
+          <h3 className="text-sm font-black text-orange-950 flex items-center gap-1.5 min-w-0">
+            <Images className="w-4 h-4 text-orange-600 shrink-0" />
+            <span className="truncate">{t('galleryAlbumLinkTitle')}</span>
+          </h3>
+          <span className="text-[11px] font-bold text-emerald-700 inline-flex items-center gap-1 whitespace-nowrap">
+            <Eye className="w-3 h-3 shrink-0" />
+            <span>{t('galleryViewOnlyNote')}</span>
+          </span>
           <p className="text-xs text-slate-600 leading-relaxed">
             {t('galleryAlbumLinkDesc')}
           </p>
@@ -582,14 +580,14 @@ export const TempleGalleryView: React.FC = () => {
           aria-modal="true"
           aria-label={t('galleryFullscreen')}
           onClick={() => setIsLightboxOpen(false)}
-          className="fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-3 sm:p-5 select-none"
+          className="fixed inset-0 z-50 h-dvh bg-black/95 flex flex-col justify-between pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] select-none overflow-hidden"
         >
           {/* Top Bar */}
           <div
-            className="flex items-center justify-between gap-2 text-white"
+            className="flex items-center justify-between gap-2 text-white shrink-0"
             onClick={e => e.stopPropagation()}
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-sm font-black text-amber-200 truncate">
                 {language === 'mr' ? TEMPLE_ALBUM_INFO.titleMr : TEMPLE_ALBUM_INFO.titleEn}
               </p>
@@ -598,20 +596,22 @@ export const TempleGalleryView: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => handleDownloadPhoto(safeIndex + 1)}
                 disabled={isDownloading}
                 aria-label={t('galleryDownload')}
-                className="min-h-[40px] px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap disabled:opacity-65"
+                className="min-w-[44px] min-h-[44px] px-2.5 sm:px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap disabled:opacity-65"
               >
                 {isDownloading ? (
                   <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                 ) : (
                   <Download className="w-4 h-4 shrink-0" />
                 )}
-                <span>{isDownloading ? t('galleryDownloading') : t('galleryDownload')}</span>
+                <span className="hidden xs:inline">
+                  {isDownloading ? t('galleryDownloading') : t('galleryDownload')}
+                </span>
               </button>
 
               <a
@@ -619,7 +619,8 @@ export const TempleGalleryView: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 title={t('galleryOpenGooglePhotos')}
-                className="min-h-[40px] px-3 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap"
+                aria-label={t('galleryOpenGooglePhotos')}
+                className="min-w-[44px] min-h-[44px] px-2.5 sm:px-3 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap"
               >
                 <span className="hidden sm:inline">Google Photos</span>
                 <ExternalLink className="w-4 h-4 shrink-0" />
@@ -629,7 +630,7 @@ export const TempleGalleryView: React.FC = () => {
                 type="button"
                 onClick={() => setIsLightboxOpen(false)}
                 aria-label={t('close')}
-                className="min-w-[42px] min-h-[42px] rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition"
+                className="min-w-[44px] min-h-[44px] rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -641,7 +642,7 @@ export const TempleGalleryView: React.FC = () => {
             onClick={e => e.stopPropagation()}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            className="relative flex-1 flex items-center justify-center my-3 min-h-0"
+            className="relative flex-1 flex items-center justify-center my-2 sm:my-3 [@media(max-height:480px)]:my-1 min-h-0"
           >
             <img
               key={`lb-${activePhoto.baseUrl}`}

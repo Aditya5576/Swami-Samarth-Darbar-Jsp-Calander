@@ -32,9 +32,9 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ onOpenOfflin
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-20 left-3 right-3 md:left-auto md:right-4 md:bottom-6 md:max-w-md z-40 flex items-center justify-between gap-2.5 rounded-2xl bg-orange-950/95 px-3.5 py-2.5 text-xs text-amber-50 shadow-lg border border-amber-400/35 backdrop-blur-sm"
+      className="fixed bottom-[calc(var(--app-bottom-nav-height,4.5rem)+0.5rem)] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] md:left-auto md:right-[max(1rem,env(safe-area-inset-right))] md:max-w-md z-40 flex items-center justify-between gap-2 rounded-2xl bg-orange-950/95 px-3 py-2 text-xs text-amber-50 shadow-lg border border-amber-400/35 backdrop-blur-sm"
     >
-      <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         {isOffline ? (
           <WifiOff className="w-4 h-4 shrink-0 text-amber-300" />
         ) : (
@@ -63,7 +63,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ onOpenOfflin
           <button
             type="button"
             onClick={onOpenOfflineVault}
-            className="min-h-[34px] px-2.5 py-1 rounded-xl bg-amber-300 hover:bg-amber-200 text-orange-950 font-black text-[11px] flex items-center gap-1 whitespace-nowrap transition"
+            className="min-h-[44px] px-3 py-1.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-orange-950 font-black text-[11px] flex items-center gap-1 whitespace-nowrap transition"
           >
             <HardDrive className="w-3.5 h-3.5 shrink-0" />
             <span>{language === 'mr' ? 'वॉल्ट' : 'Vault'}</span>
@@ -73,9 +73,9 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ onOpenOfflin
           type="button"
           onClick={() => setDismissedKey(stateKey)}
           aria-label={t('close')}
-          className="min-w-[32px] min-h-[32px] rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-amber-100 transition"
+          className="min-w-[44px] min-h-[44px] rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-amber-100 transition"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
     </div>

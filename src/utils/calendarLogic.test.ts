@@ -26,7 +26,7 @@ test('Swami Samarth Prakat Din is on March 20, 2026', () => {
   assert.equal(prakatDay.isSwamiSpecial, true);
   const festival = prakatDay.festivals.find(f => f.id === 'swami-prakat-din');
   assert.ok(festival, 'Festival swami-prakat-din should be present');
-  assert.equal(festival.title, 'श्री स्वामी समर्थ महाराज प्रगट दिन');
+  assert.equal(festival.title, 'श्री स्वामी समर्थ महाराज प्रगट दिन महामहोत्सव');
 });
 
 test('Swami Samarth Mahasamadhi Day is on April 15, 2026', () => {
@@ -106,4 +106,27 @@ test('buildTodayNotificationMessage correctly builds Sankashti notification with
 
   const enNotif = buildTodayNotificationMessage(oct29Day, 'en');
   assert.ok(enNotif.title.includes('Sankashti Chaturthi'), 'Should announce Sankashti Chaturthi in English');
+  assert.equal(oct29Day.isEstimated, false, '2026 curated day should not be marked estimated');
+  assert.ok(!enNotif.title.includes('Estimated'), '2026 curated notification should not carry Estimated suffix');
 });
+
+test('Non-2026 years are explicitly flagged as estimated and 2027 samvatsar spelling is clean', async () => {
+  const { YEAR_METADATA } = await import('./calendarMultiYear');
+  assert.equal(YEAR_METADATA[2027].samvatsarMr, 'पराभव - प्लवंग नाम संवत्सर');
+
+  const meta2026 = getMonthMeta(3, 2026);
+  assert.equal(meta2026.isEstimated, false, '2026 month metadata should be curated');
+
+  const meta2027 = getMonthMeta(3, 2027);
+  assert.equal(meta2027.isEstimated, true, '2027 month metadata should be flagged as estimated');
+
+  const jan2027 = getDayByDate('2027-01-15');
+  assert.ok(jan2027, '2027 date should exist');
+  assert.equal(jan2027.isEstimated, true, '2027 day should be flagged as estimated');
+
+  const mrEstNotif = buildTodayNotificationMessage(jan2027, 'mr');
+  assert.ok(mrEstNotif.title.includes('अंदाजित'), 'Marathi notification for estimated year must label estimate');
+  const enEstNotif = buildTodayNotificationMessage(jan2027, 'en');
+  assert.ok(enEstNotif.title.includes('Estimated'), 'English notification for estimated year must label estimate');
+});
+

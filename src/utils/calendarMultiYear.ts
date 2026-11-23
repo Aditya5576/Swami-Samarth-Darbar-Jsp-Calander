@@ -1,4 +1,4 @@
-import { DayData, MonthMeta, FestivalEvent } from '../types/calendar';
+import type { DayData, MonthMeta, FestivalEvent } from '../types/calendar';
 import { generate2026DaysForMonth, MONTHS_META as MONTHS_META_2026, MARATHI_DAYS, MARATHI_DAYS_SHORT } from '../data/calendar2026Data';
 
 export const SUPPORTED_YEARS = [2025, 2026, 2027, 2028, 2029, 2030] as const;
@@ -25,7 +25,7 @@ export const YEAR_METADATA: Record<number, {
   },
   2027: {
     shakeYear: 'शक १९४८ - १९४९',
-    samvatsarMr: 'पराभव - प्लवंग नाम संवत्ser',
+    samvatsarMr: 'पराभव - प्लवंग नाम संवत्सर',
     samvatsarEn: 'Parabhava - Plavanga Samvatsar',
     headerQuote: 'अशक्य ही शक्य करतील स्वामी - नित्य सेवा, ध्यान व सदाचार.',
   },
@@ -100,7 +100,7 @@ export function getDaysInMonth(year: number, monthNumber: number): number {
 export function getMultiYearMonthMeta(year: number, monthNumber: number): MonthMeta {
   if (year === 2026) {
     const meta2026 = MONTHS_META_2026.find(m => m.monthNumber === monthNumber);
-    if (meta2026) return meta2026;
+    if (meta2026) return { ...meta2026, isEstimated: false };
   }
 
   const totalDays = getDaysInMonth(year, monthNumber);
@@ -132,6 +132,7 @@ export function getMultiYearMonthMeta(year: number, monthNumber: number): MonthM
     totalDays,
     startDayOfWeek,
     headerQuote: yearInfo.headerQuote,
+    isEstimated: true,
   };
 }
 
@@ -144,9 +145,12 @@ export function getMultiYearMonthDays(year: number, monthNumber: number): DayDat
     return multiYearCache.get(cacheKey)!;
   }
 
-  // Use curated data for 2026
+  // Use curated Jaysingpur Panchang data for 2026
   if (year === 2026) {
-    const days2026 = generate2026DaysForMonth(monthNumber);
+    const days2026 = generate2026DaysForMonth(monthNumber).map(d => ({
+      ...d,
+      isEstimated: false,
+    }));
     multiYearCache.set(cacheKey, days2026);
     return days2026;
   }
@@ -369,8 +373,8 @@ export function getMultiYearMonthDays(year: number, monthNumber: number): DayDat
       tithi: tithiName,
       paksha: paksha as any,
       nakshatra,
-      sunrise: `सकाळी ०६:${String(10 + (monthNumber % 15)).padStart(2, '0')}`,
-      sunset: `सायं ०६:${String(20 + (monthNumber % 25)).padStart(2, '0')}`,
+      sunrise: `सकाळी ०६:${String(10 + (monthNumber % 15)).padStart(2, '0').replace(/[0-9]/g, ch => '०१२३४५६७८९'[Number(ch)])}`,
+      sunset: `सायं ०६:${String(20 + (monthNumber % 25)).padStart(2, '0').replace(/[0-9]/g, ch => '०१२३४५६७८९'[Number(ch)])}`,
       isToday: false,
       isSankashti,
       isEkadashi,
@@ -382,6 +386,7 @@ export function getMultiYearMonthDays(year: number, monthNumber: number): DayDat
       moonriseTime,
       festivals,
       swamiGuidance: guidance,
+      isEstimated: true,
     });
   }
 

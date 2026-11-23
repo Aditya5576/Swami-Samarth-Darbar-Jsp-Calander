@@ -153,9 +153,9 @@ export const OfflineMediaPlayer: React.FC<OfflineMediaPlayerProps> = ({
             />
           </div>
           <div className="min-w-0 flex-1 space-y-1 text-left">
-            <p className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+            <p className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5 min-w-0">
               <HardDrive className="w-3.5 h-3.5 shrink-0" />
-              <span>{t('offlinePlaybackReady')}</span>
+              <span className="truncate whitespace-nowrap">{t('offlinePlaybackReady')}</span>
             </p>
             <p className="text-xs sm:text-sm font-black text-amber-50 leading-snug line-clamp-2">
               {record.title}
@@ -191,11 +191,11 @@ export const OfflineMediaPlayer: React.FC<OfflineMediaPlayerProps> = ({
           value={Math.min(currentTime, duration || 100)}
           onChange={handleSeek}
           aria-label={language === 'mr' ? 'गाणे पुढे-मागे करा' : 'Seek audio position'}
-          className="w-full h-1.5 accent-amber-300 cursor-pointer"
+          className="w-full min-h-[36px] py-3 accent-amber-300 cursor-pointer"
         />
-        <div className="flex items-center justify-between text-[11px] font-semibold text-amber-100/90 tabular-nums">
+        <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-amber-100/90 tabular-nums whitespace-nowrap">
           <span>{formatDuration(currentTime)}</span>
-          <span className="text-[10px] text-amber-200/80">
+          <span className="text-[10px] text-amber-200/80 truncate">
             {record.mediaKind === 'video' ? 'MP4 · ' : 'MP3 · '}
             {formatBytes(record.sizeBytes)}
           </span>
@@ -204,11 +204,11 @@ export const OfflineMediaPlayer: React.FC<OfflineMediaPlayerProps> = ({
       </div>
 
       {/* Primary Controls Bar: Play/Pause, Loop, Temple Bell */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-nowrap">
         <button
           type="button"
           onClick={handleTogglePlay}
-          className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-95 cursor-pointer whitespace-nowrap ${
+          className={`flex-1 min-w-0 min-h-[44px] py-2.5 px-3 sm:px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-95 cursor-pointer whitespace-nowrap ${
             isPlaying
               ? 'bg-amber-100 hover:bg-white text-orange-950'
               : 'bg-gradient-to-r from-amber-300 to-yellow-300 hover:from-amber-200 hover:to-yellow-200 text-orange-950'
@@ -217,12 +217,12 @@ export const OfflineMediaPlayer: React.FC<OfflineMediaPlayerProps> = ({
           {isPlaying ? (
             <>
               <Pause className="w-4 h-4 fill-current text-orange-900 shrink-0" />
-              <span>{pauseLabel}</span>
+              <span className="truncate">{pauseLabel}</span>
             </>
           ) : (
             <>
               <Play className="w-4 h-4 fill-current text-orange-900 shrink-0" />
-              <span>{playLabel}</span>
+              <span className="truncate">{playLabel}</span>
             </>
           )}
         </button>

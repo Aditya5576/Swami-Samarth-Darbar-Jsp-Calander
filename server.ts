@@ -1,5 +1,6 @@
 import express from 'express';
 import type { Request, Response } from 'express';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -7,7 +8,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT) || 3000;
-const IS_PROD = process.env.NODE_ENV === 'production';
+const IS_DEV_FLAG = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+const HAS_DIST_BUILD = fs.existsSync(path.resolve(__dirname, 'dist', 'index.html'));
+const IS_PROD = !IS_DEV_FLAG && (process.env.NODE_ENV === 'production' || HAS_DIST_BUILD);
 
 // Fixed, allowlisted official YouTube channel metadata for @kumudinidabade
 const YOUTUBE_CHANNEL_ID = 'UCO0GP_5MwcHC5E8WJj-t_hg';
@@ -49,6 +52,7 @@ const SEED_TEMPLE_PHOTOS: TemplePhotoItem[] = [
 let cachedGalleryPhotos: TemplePhotoItem[] | null = null;
 let cachedGalleryTitle = TEMPLE_ALBUM_TITLE;
 let cachedGalleryAtMs = 0;
+let inFlightGalleryPromise: Promise<{ title: string; photos: TemplePhotoItem[] }> | null = null;
 
 interface ChannelVideo {
   videoId: string;
@@ -104,6 +108,7 @@ const SEED_VIDEOS: ChannelVideo[] = [
 
 let cachedVideos: ChannelVideo[] | null = null;
 let cachedAtMs = 0;
+let inFlightVideosPromise: Promise<ChannelVideo[]> | null = null;
 
 function decodeXmlEntities(input: string): string {
   return input
@@ -234,6 +239,24 @@ async function fetchLiveTempleAlbumPhotos(): Promise<{ title: string; photos: Te
   }
 }
 
+function getCoalescedLiveChannelVideos(): Promise<ChannelVideo[]> {
+  if (!inFlightVideosPromise) {
+    inFlightVideosPromise = fetchLiveChannelVideos().finally(() => {
+      inFlightVideosPromise = null;
+    });
+  }
+  return inFlightVideosPromise;
+}
+
+function getCoalescedLiveTempleAlbumPhotos(): Promise<{ title: string; photos: TemplePhotoItem[] }> {
+  if (!inFlightGalleryPromise) {
+    inFlightGalleryPromise = fetchLiveTempleAlbumPhotos().finally(() => {
+      inFlightGalleryPromise = null;
+    });
+  }
+  return inFlightGalleryPromise;
+}
+
 async function startServer() {
   const app = express();
   app.disable('x-powered-by');
@@ -270,7 +293,7 @@ async function startServer() {
     }
 
     try {
-      const liveVideos = await fetchLiveChannelVideos();
+      const liveVideos = await getCoalescedLiveChannelVideos();
       cachedVideos = liveVideos;
       cachedAtMs = Date.now();
 
@@ -322,7 +345,7 @@ async function startServer() {
     }
 
     try {
-      const live = await fetchLiveTempleAlbumPhotos();
+      const live = await getCoalescedLiveTempleAlbumPhotos();
       cachedGalleryPhotos = live.photos;
       cachedGalleryTitle = live.title;
       cachedGalleryAtMs = Date.now();
@@ -368,7 +391,7 @@ async function startServer() {
     let pool = cachedGalleryPhotos;
     if (!pool || pool.length === 0) {
       try {
-        const live = await fetchLiveTempleAlbumPhotos();
+        const live = await getCoalescedLiveTempleAlbumPhotos();
         cachedGalleryPhotos = live.photos;
         cachedGalleryTitle = live.title;
         cachedGalleryAtMs = Date.now();

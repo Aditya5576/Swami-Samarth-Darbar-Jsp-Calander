@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { DayData } from '../types/calendar';
+import type { DayData } from '../types/calendar';
 import { getMonthDays, SUPPORTED_YEARS } from '../utils/calendarLogic';
 import { useLanguage } from '../context/LanguageContext';
 import {
   Sparkles,
   ChevronRight,
+  Info,
 } from 'lucide-react';
 
 interface FestivalsViewProps {
@@ -64,20 +65,21 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
       <div className="rounded-2xl sm:rounded-3xl bg-white p-3 sm:p-4 shadow-xs border border-orange-100 space-y-3">
         {/* Year Switcher (Grid of 6 equal pills - NEVER overflows or gets cut off!) */}
         <div className="space-y-1.5 pb-2.5 border-b border-orange-100">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500">
+          <div className="flex items-center justify-between flex-nowrap gap-2">
+            <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">
               {language === 'mr' ? 'वर्ष निवडा:' : 'Select Year:'}
             </span>
-            <span className="text-xs font-black text-orange-900 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/60">
+            <span className="text-xs font-black text-orange-900 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/60 tabular-nums whitespace-nowrap shrink-0">
               {activeYear}
             </span>
           </div>
-          <div className="grid grid-cols-6 gap-1 w-full">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 w-full">
             {SUPPORTED_YEARS.map(yr => (
               <button
+                type="button"
                 key={yr}
                 onClick={() => handleSetYear(yr)}
-                className={`py-1 rounded-lg text-xs font-black text-center transition-all active:scale-95 ${
+                className={`min-h-[40px] py-1.5 rounded-xl text-xs font-black text-center transition-all active:scale-95 whitespace-nowrap tabular-nums ${
                   activeYear === yr
                     ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-xs'
                     : 'bg-orange-50/70 hover:bg-orange-100/70 text-orange-950 border border-orange-200/50'
@@ -87,9 +89,19 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
               </button>
             ))}
           </div>
+          {activeYear !== 2026 && (
+            <div className="mt-2 rounded-xl bg-amber-50 border border-amber-300 px-3 py-2 flex items-start gap-2 text-[11px] font-semibold text-amber-950 leading-snug">
+              <Info className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+              <span>
+                {language === 'mr'
+                  ? `${activeYear} च्या सण व व्रतांच्या तारखा अंदाजित खगोलीय गणनेवर आधारित आहेत. अचूक तारखांसाठी स्थानिक पंचांग पहावे.`
+                  : `${activeYear} festival and vrat dates are astronomical estimates. Please verify exact dates with a local Panchang.`}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-10 h-10 rounded-xl p-0.5 bg-gradient-to-tr from-amber-300 to-yellow-100 ring-2 ring-orange-400 shrink-0 shadow-2xs overflow-hidden">
             <img
               src="/pwa-192x192.png"
@@ -97,16 +109,16 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
               className="w-full h-full object-cover rounded-lg"
             />
           </div>
-          <div>
-            <h2 className="text-base sm:text-lg font-black text-orange-950 flex items-center gap-1.5">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm sm:text-lg font-black text-orange-950 flex items-center gap-1.5 min-w-0">
               <Sparkles className="w-4 h-4 text-orange-600 shrink-0" />
-              <span>
+              <span className="truncate">
                 {language === 'en'
                   ? `Festivals & Panchang ${activeYear}`
                   : `सण, उत्सव, व्रत व पंचांग ${activeYear}`}
               </span>
             </h2>
-            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug">
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 leading-snug truncate">
               {t('festivalsSubtitle')}
             </p>
           </div>
@@ -124,8 +136,9 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
           ].map(btn => (
             <button
               key={btn.id}
+              type="button"
               onClick={() => setActiveFilter(btn.id as FilterKey)}
-              className={`shrink-0 px-2.5 py-1 rounded-xl text-xs font-bold transition-all active:scale-95 whitespace-nowrap ${
+              className={`shrink-0 min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 whitespace-nowrap ${
                 activeFilter === btn.id
                   ? 'bg-orange-600 text-white shadow-xs'
                   : 'bg-orange-50/80 hover:bg-orange-100 text-orange-950 border border-orange-200/60'
@@ -145,46 +158,49 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
           </div>
         ) : (
           filteredDays.map(day => (
-            <div
+            <button
               key={day.date}
+              type="button"
               onClick={() => onSelectDay(day)}
-              className="cursor-pointer rounded-2xl bg-white p-3 sm:p-3.5 shadow-2xs border border-orange-100/90 hover:border-orange-300 transition-all active:scale-98"
+              className="w-full text-left cursor-pointer rounded-2xl bg-white p-3 sm:p-3.5 shadow-2xs border border-orange-100/90 hover:border-orange-300 transition-all active:scale-[0.99]"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-2.5 sm:gap-3">
                 {/* Date Badge Column */}
                 <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-200 flex flex-col items-center justify-center shrink-0">
-                  <span className="text-sm font-black text-orange-950 leading-none">
+                  <span className="text-sm font-black text-orange-950 leading-none tabular-nums whitespace-nowrap">
                     {day.dayOfMonth}
                   </span>
-                  <span className="text-[9px] font-bold text-orange-700 leading-none mt-0.5">
+                  <span className="text-[9px] font-bold text-orange-700 leading-none mt-0.5 whitespace-nowrap">
                     {getDayName(day.dayOfWeek, true)}
                   </span>
-                  <span className="text-[8px] font-semibold text-slate-500 leading-none mt-0.5">
+                  <span className="text-[8px] font-semibold text-slate-500 leading-none mt-0.5 whitespace-nowrap">
                     {getMonthName(day.month).slice(0, 3)}
                   </span>
                 </div>
 
                 {/* Details Column */}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                  <div className="flex items-center justify-between flex-nowrap gap-1.5 min-w-0">
+                    <span className="text-[11px] text-slate-600 font-medium leading-snug truncate whitespace-nowrap min-w-0">
                       {day.tithi} ({day.paksha} {t('paksha')}) • {day.nakshatra}
                     </span>
-                    {day.isSwamiSpecial && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-orange-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
-                        {language === 'mr' ? 'स्वामी विशेष' : 'Swami Special'}
-                      </span>
-                    )}
-                    {day.isEkadashi && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
-                        {language === 'mr' ? 'एकादशी' : 'Ekadashi'}
-                      </span>
-                    )}
-                    {day.isSankashti && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
-                        {language === 'mr' ? 'संकष्टी' : 'Sankashti'}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {day.isSwamiSpecial && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-orange-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
+                          {language === 'mr' ? 'स्वामी विशेष' : 'Swami Special'}
+                        </span>
+                      )}
+                      {day.isEkadashi && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
+                          {language === 'mr' ? 'एकादशी' : 'Ekadashi'}
+                        </span>
+                      )}
+                      {day.isSankashti && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[8px] font-black shrink-0 whitespace-nowrap">
+                          {language === 'mr' ? 'संकष्टी' : 'Sankashti'}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Festival Titles */}
@@ -217,7 +233,7 @@ export const FestivalsView: React.FC<FestivalsViewProps> = ({
                   <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
-            </div>
+            </button>
           ))
         )}
       </div>

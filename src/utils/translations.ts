@@ -246,6 +246,11 @@ export const TRANSLATIONS = {
     galleryAlbumLinkTitle: 'संपूर्ण Google Photos मंदिर अल्बम',
     galleryAlbumLinkDesc: 'जयसिंगपूर श्री स्वामी समर्थ सेवा दरबारमधील सर्व उच्च-दर्जाचे फोटो पाहण्यासाठी व डाऊनलोड करण्यासाठी Google Photos अल्बम उघडा (केवळ दर्शन व डाऊनलोडसाठी).',
     galleryOpenGooglePhotos: 'अल्बम पहा व डाऊनलोड करा',
+    whatsNewTitle: 'नवीन अपडेट व सुधारणा',
+    whatsNewUpgradeLabel: 'नवीन सुविधा',
+    whatsNewFixLabel: 'अडचण निराकरण',
+    whatsNewOkBtn: 'ठीक आहे (OK)',
+    whatsNewFooterLink: 'नवीन अपडेट पहा',
   },
   en: {
     appTitle: 'Shree Swami Samarth Seva Kendra',
@@ -486,6 +491,11 @@ export const TRANSLATIONS = {
     galleryAlbumLinkTitle: 'Official Google Photos Temple Album',
     galleryAlbumLinkDesc: 'Open the Swami Samarth Darbar Google Photos album for viewing and downloading temple photographs only (no upload option).',
     galleryOpenGooglePhotos: 'View & Download Album',
+    whatsNewTitle: "What's New & Fixed",
+    whatsNewUpgradeLabel: 'Upgraded',
+    whatsNewFixLabel: 'Solved',
+    whatsNewOkBtn: 'OK',
+    whatsNewFooterLink: 'View Updates',
   }
 };
 

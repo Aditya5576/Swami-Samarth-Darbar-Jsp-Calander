@@ -49,6 +49,7 @@ export interface DayData {
   festivals: FestivalEvent[];
   shubhMuhuratNotes?: string[];
   swamiGuidance?: string;
+  isEstimated?: boolean;
 }
 
 export interface MonthMeta {
@@ -62,6 +63,7 @@ export interface MonthMeta {
   totalDays: number;
   startDayOfWeek: number;
   headerQuote: string;
+  isEstimated?: boolean;
 }
 
 export interface NityaSevaItem {

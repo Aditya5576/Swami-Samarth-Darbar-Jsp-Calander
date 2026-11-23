@@ -64,6 +64,7 @@ export function getParayanSchedule(mode: ParayanMode): ParayanDayPlan[] {
 }
 
 export function getParayanDayForAdhyay(adhyayId: number, mode: ParayanMode): number {
+  const safeId = Math.min(Math.max(Math.round(adhyayId), 1), 21);
   const perDay = mode === '3day' ? 7 : mode === '7day' ? 3 : 1;
-  return Math.ceil(adhyayId / perDay);
+  return Math.ceil(safeId / perDay);
 }

@@ -3,6 +3,7 @@ import {
   X,
   HardDrive,
   CheckCircle2,
+  AlertTriangle,
   Upload,
   Trash2,
   Play,
@@ -15,13 +16,16 @@ import {
   Download,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { useNetworkStatus, DataSaverPreference } from '../hooks/useNetworkStatus';
-import { KUMUDINI_SEED_VIDEOS, ChannelVideo } from '../data/youtubeChannel';
+import { useDialogA11y } from '../hooks/useDialogA11y';
+import { useNetworkStatus, type DataSaverPreference } from '../hooks/useNetworkStatus';
+import { KUMUDINI_SEED_VIDEOS, type ChannelVideo } from '../data/youtubeChannel';
 import { toMarathiDigits } from '../data/saramrut';
 import {
-  OfflineMediaMeta,
-  OfflineMediaRecord,
-  VaultStorageSummary,
+  type OfflineMediaMeta,
+  type OfflineMediaRecord,
+  type VaultStorageSummary,
+  type OfflinePrepareReport,
+  type OfflineReadinessStatus,
   TARAK_MANTRA_MEDIA_ID,
   listOfflineMediaMeta,
   getVaultStorageSummary,
@@ -30,6 +34,7 @@ import {
   getOfflineMedia,
   prepareOfflineSevaApp,
   getLastPreparedTimestamp,
+  getLastPreparedStatus,
   isServiceWorkerActive,
   subscribeVaultChanges,
   formatBytes,
@@ -80,6 +85,8 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
   });
   const [swActive, setSwActive] = useState(false);
   const [lastPreparedAt, setLastPreparedAt] = useState<string | null>(() => getLastPreparedTimestamp());
+  const [readinessStatus, setReadinessStatus] = useState<OfflineReadinessStatus | null>(() => getLastPreparedStatus());
+  const [lastReport, setLastReport] = useState<OfflinePrepareReport | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [prepareProgress, setPrepareProgress] = useState(0);
   const [prepareStatusMsg, setPrepareStatusMsg] = useState<string | null>(null);
@@ -87,6 +94,7 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [previewRecord, setPreviewRecord] = useState<OfflineMediaRecord | null>(null);
 
+  const dialogRef = useDialogA11y(isOpen, onClose);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingTargetRef = useRef<CatalogSongItem | null>(null);
 
@@ -121,6 +129,7 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
     setStorageSummary(summary);
     setSwActive(activeSw || Boolean((window as unknown as { __SWAMI_SW_OFFLINE_READY__?: boolean }).__SWAMI_SW_OFFLINE_READY__));
     setLastPreparedAt(getLastPreparedTimestamp());
+    setReadinessStatus(getLastPreparedStatus());
   }, []);
 
   useEffect(() => {
@@ -149,26 +158,43 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
         if (stepKey === 'sw') {
           setPrepareStatusMsg(language === 'mr' ? 'ऑफलाईन इंजिन तपासत आहे...' : 'Verifying offline engine...');
         } else if (stepKey === 'core') {
-          setPrepareStatusMsg(language === 'mr' ? 'पंचांग, सारामृत, मूर्ती व नामजप सेव्ह करत आहे...' : 'Caching Panchang, Saramrut, Murti & chant voice...');
+          setPrepareStatusMsg(language === 'mr' ? 'मुख्य अ‍ॅप फाईल्स, मूर्ती व नामजप तपासत आहे...' : 'Caching & verifying core app, Murti & chant voice...');
         } else if (stepKey === 'channel') {
-          setPrepareStatusMsg(language === 'mr' ? 'भजन यादी व थंबनेल सेव्ह करत आहे...' : 'Caching bhajan playlist & thumbnails...');
+          setPrepareStatusMsg(language === 'mr' ? 'पर्यायी भजन यादी व थंबनेल तपासत आहे...' : 'Warming optional playlist thumbnails...');
         }
       });
 
+      setLastReport(report);
       setLastPreparedAt(report.preparedAt);
-      setSwActive(report.swActive || true);
+      setReadinessStatus(report.status);
+      setSwActive(report.swActive);
       await refreshVaultState();
 
-      setPrepareStatusMsg(
-        language === 'mr'
-          ? `ऑफलाईन सेवा पूर्णपणे सज्ज! (${toMarathiDigits(report.cachedCoreCount)}/${toMarathiDigits(report.totalCoreCount)} मुख्य फाईल्स सुरक्षित)`
-          : `Offline Seva Ready! (${report.cachedCoreCount}/${report.totalCoreCount} core assets cached)`
-      );
+      if (report.status === 'ready') {
+        setPrepareStatusMsg(
+          language === 'mr'
+            ? `ऑफलाईन सेवा पूर्णपणे सज्ज! (${toMarathiDigits(report.cachedCoreCount)}/${toMarathiDigits(report.totalCoreCount)} मुख्य फाईल्स सुरक्षित)`
+            : `Offline Seva Ready! (${report.cachedCoreCount}/${report.totalCoreCount} core assets verified)`
+        );
+      } else if (report.status === 'partial') {
+        setPrepareStatusMsg(
+          language === 'mr'
+            ? `अंशतः सज्ज (${toMarathiDigits(report.cachedCoreCount)}/${toMarathiDigits(report.totalCoreCount)} मुख्य फाईल्स${!report.swActive ? ' · Service Worker सक्रिय नाही' : ''}). कृपया एकदा ऑनलाईन असताना पुन्हा प्रयत्न करा.`
+            : `Partially Ready (${report.cachedCoreCount}/${report.totalCoreCount} core assets${!report.swActive ? ' · Service Worker not active yet' : ''}). Retry once online.`
+        );
+      } else {
+        setPrepareStatusMsg(
+          language === 'mr'
+            ? 'ऑफलाईन कॅश अयशस्वी झाले (Cache Storage उपलब्ध नाही किंवा नेटवर्क बंद आहे).'
+            : 'Offline preparation failed (Cache Storage unavailable or core files could not be cached).'
+        );
+      }
     } catch {
+      setReadinessStatus('failed');
       setPrepareStatusMsg(
         language === 'mr'
-          ? 'ऑफलाईन कॅश अद्ययावत झाला.'
-          : 'Offline cache refreshed.'
+          ? 'ऑफलाईन तयारी पूर्ण होऊ शकली नाही. कृपया पुन्हा प्रयत्न करा.'
+          : 'Offline preparation could not complete. Please retry.'
       );
     } finally {
       setIsPreparing(false);
@@ -272,14 +298,16 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-xs p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-xs p-0 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] sm:p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={t('offlineVaultTitle')}
+      aria-labelledby="offline-vault-title"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-lg max-h-[90vh] bg-amber-50 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-amber-200 flex flex-col overflow-hidden"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="w-full sm:max-w-lg max-h-[90dvh] bg-amber-50 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-amber-200 flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] focus:outline-none"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -289,7 +317,7 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
               <ShieldCheck className="w-5 h-5 text-amber-200" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-black text-white truncate">
+              <h2 id="offline-vault-title" className="text-sm sm:text-base font-black text-white truncate">
                 {t('offlineVaultTitle')}
               </h2>
               <p className="text-[11px] text-amber-100/90 font-medium truncate">
@@ -302,7 +330,7 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
             type="button"
             onClick={onClose}
             aria-label={t('close')}
-            className="min-w-[40px] min-h-[40px] rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition active:scale-95 shrink-0"
+            className="min-w-[44px] min-h-[44px] rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition active:scale-95 shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -337,10 +365,10 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
               type="button"
               onClick={handlePrepareOffline}
               disabled={isPreparing}
-              className="w-full min-h-[46px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-[0.99] disabled:opacity-70 whitespace-nowrap"
+              className="w-full min-h-[46px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 text-center shadow-sm transition active:scale-[0.99] disabled:opacity-70 whitespace-nowrap"
             >
               <RefreshCw className={`w-4 h-4 shrink-0 ${isPreparing ? 'animate-spin' : ''}`} />
-              <span>
+              <span className="truncate">
                 {isPreparing ? t('preparingOfflineBtn') : t('prepareOfflineBtn')}
               </span>
             </button>
@@ -355,36 +383,80 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
             )}
 
             {prepareStatusMsg && (
-              <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                <span>{prepareStatusMsg}</span>
-              </p>
+              <div
+                className={`rounded-xl px-3 py-2 text-xs font-bold flex items-start gap-2 border ${
+                  readinessStatus === 'ready'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : readinessStatus === 'partial'
+                    ? 'bg-amber-50 border-amber-300 text-amber-900'
+                    : 'bg-red-50 border-red-200 text-red-800'
+                }`}
+              >
+                {readinessStatus === 'ready' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                )}
+                <div className="space-y-0.5 min-w-0">
+                  <p>{prepareStatusMsg}</p>
+                  {lastReport && lastReport.totalThumbsAttempted > 0 && (
+                    <p className="text-[11px] font-medium opacity-90">
+                      {language === 'mr'
+                        ? `पर्यायी थंबनेल: ${toMarathiDigits(lastReport.cachedThumbsCount)}/${toMarathiDigits(lastReport.totalThumbsAttempted)} (मुख्य ऑफलाईन सेवेपासून वेगळे)`
+                        : `Optional thumbnails: ${lastReport.cachedThumbsCount}/${lastReport.totalThumbsAttempted} (separate from core readiness)`}
+                    </p>
+                  )}
+                  {lastReport && lastReport.unreadableVaultCount > 0 && (
+                    <p className="text-[11px] font-semibold text-red-700">
+                      {language === 'mr'
+                        ? `${toMarathiDigits(lastReport.unreadableVaultCount)} सेव्ह केलेली फाईल वाचता आली नाही — कृपया पुन्हा निवडा.`
+                        : `${lastReport.unreadableVaultCount} saved vault file(s) could not be read — please re-import.`}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
 
-            {/* Readiness Checklist */}
-            <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-semibold text-slate-700">
-              <div className="flex items-center gap-1.5 bg-amber-50/70 rounded-xl px-2.5 py-2 border border-amber-200/60">
+            {/* Readiness Checklist — crisp 2x2 non-wrapping grid */}
+            <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px] font-semibold text-slate-700">
+              <div className="flex items-center gap-1.5 bg-amber-50/70 rounded-xl px-2 py-2 border border-amber-200/60 min-w-0">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">{language === 'mr' ? 'दिनदर्शिका व पंचांग' : 'Calendar & Panchang'}</span>
+                <span className="truncate whitespace-nowrap">{language === 'mr' ? 'दिनदर्शिका व पंचांग' : 'Calendar & Panchang'}</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-amber-50/70 rounded-xl px-2.5 py-2 border border-amber-200/60">
+              <div className="flex items-center gap-1.5 bg-amber-50/70 rounded-xl px-2 py-2 border border-amber-200/60 min-w-0">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">{language === 'mr' ? '२१ अध्याय सारामृत' : '21 Saramrut Adhyays'}</span>
+                <span className="truncate whitespace-nowrap">{language === 'mr' ? '२१ अध्याय सारामृत' : '21 Saramrut Adhyays'}</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-amber-50/70 rounded-xl px-2.5 py-2 border border-amber-200/60">
+              <div className="flex items-center gap-1.5 bg-amber-50/70 rounded-xl px-2 py-2 border border-amber-200/60 min-w-0">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">{language === 'mr' ? '१०८ जपमाळ व स्वर' : '108 Japa & Voice'}</span>
+                <span className="truncate whitespace-nowrap">{language === 'mr' ? '१०८ जपमाळ व स्वर' : '108 Japa & Voice'}</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-amber-50/70 rounded-xl px-2.5 py-2 border border-amber-200/60">
-                <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${swActive || lastPreparedAt ? 'text-emerald-600' : 'text-amber-500'}`} />
-                <span className="truncate">
-                  {swActive || lastPreparedAt
+              <div className="flex items-center gap-1.5 bg-amber-50/70 rounded-xl px-2 py-2 border border-amber-200/60 min-w-0">
+                {readinessStatus === 'ready' && swActive ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                ) : (
+                  <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${readinessStatus === 'failed' ? 'text-red-600' : 'text-amber-600'}`} />
+                )}
+                <span className="truncate whitespace-nowrap">
+                  {readinessStatus === 'ready' && swActive
                     ? language === 'mr'
-                      ? 'ऑफलाईन कॅश सज्ज'
-                      : 'App Cache Ready'
+                      ? 'ऑफलाईन सज्ज'
+                      : 'Verified Ready'
+                    : readinessStatus === 'partial'
+                    ? language === 'mr'
+                      ? 'अंशतः सज्ज'
+                      : 'Partially Ready'
+                    : readinessStatus === 'failed'
+                    ? language === 'mr'
+                      ? 'अयशस्वी (Retry)'
+                      : 'Cache Failed'
+                    : lastPreparedAt && swActive
+                    ? language === 'mr'
+                      ? 'कॅश सज्ज'
+                      : 'Cache Ready'
                     : language === 'mr'
                     ? 'कॅश सज्ज करा'
-                    : 'Tap to Cache'}
+                    : 'Tap to Verify'}
                 </span>
               </div>
             </div>
@@ -419,7 +491,7 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
                     key={opt.id}
                     type="button"
                     onClick={() => network.setDataSaverPreference(opt.id)}
-                    className={`min-h-[38px] px-2 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                    className={`min-h-[44px] px-1.5 sm:px-2 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition leading-tight whitespace-nowrap truncate min-w-0 ${
                       active
                         ? 'bg-orange-600 text-white shadow-xs'
                         : 'text-orange-950 hover:bg-amber-100/80'
@@ -439,12 +511,12 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
           {/* 3. Offline Audio & Video Vault */}
           <section className="rounded-2xl bg-white border border-orange-200/80 shadow-2xs overflow-hidden">
             <div className="p-4 border-b border-orange-100 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-black text-orange-950 flex items-center gap-1.5">
+              <div className="flex items-center justify-between flex-nowrap gap-2">
+                <h3 className="text-sm font-black text-orange-950 flex items-center gap-1.5 min-w-0">
                   <HardDrive className="w-4 h-4 text-orange-600 shrink-0" />
-                  <span>{t('vaultSongsHeading')}</span>
+                  <span className="truncate">{t('vaultSongsHeading')}</span>
                 </h3>
-                <span className="text-xs font-bold text-orange-800 tabular-nums">
+                <span className="text-xs font-bold text-orange-800 tabular-nums whitespace-nowrap shrink-0">
                   {language === 'mr'
                     ? `${toMarathiDigits(savedCount)} / ${toMarathiDigits(totalCatalogCount)} सेव्ह`
                     : `${savedCount} / ${totalCatalogCount} saved`}
@@ -456,21 +528,21 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
               </p>
 
               {/* Storage Usage Strip */}
-              <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-slate-600 bg-amber-50/80 rounded-xl px-3 py-2 border border-amber-200/60 tabular-nums">
-                <span>
+              <div className="flex items-center justify-between flex-nowrap gap-2 text-[11px] font-semibold text-slate-600 bg-amber-50/80 rounded-xl px-3 py-2 border border-amber-200/60 tabular-nums">
+                <span className="whitespace-nowrap truncate">
                   {language === 'mr' ? 'वॉल्ट साठवण:' : 'Vault Used:'}{' '}
                   <strong className="text-orange-950">{formatBytes(storageSummary.vaultBytes)}</strong>
                 </span>
-                <span>
+                <span className="whitespace-nowrap shrink-0">
                   {storageSummary.browserQuotaBytes
                     ? `${language === 'mr' ? 'उपलब्ध:' : 'Quota:'} ${formatBytes(storageSummary.browserQuotaBytes)}`
                     : storageSummary.isPersisted
                     ? language === 'mr'
-                      ? 'सुरक्षित साठवण सक्रिय'
-                      : 'Persistent storage active'
+                      ? 'सुरक्षित साठवण'
+                      : 'Persistent'
                     : language === 'mr'
                     ? 'डिव्हाइस साठवण'
-                    : 'On-device storage'}
+                    : 'On-device'}
                 </span>
               </div>
 
@@ -534,23 +606,23 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center flex-nowrap gap-1.5">
                       {saved && (
                         <button
                           type="button"
                           onClick={() => handlePreviewSong(song.mediaId)}
-                          className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+                          className={`flex-1 min-w-0 min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${
                             isPreviewing
                               ? 'bg-orange-700 text-white'
                               : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                           }`}
                         >
                           <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-                          <span>
+                          <span className="truncate">
                             {isPreviewing
                               ? language === 'mr'
-                                ? 'प्लेअर बंद करा'
-                                : 'Close Player'
+                                ? 'बंद करा'
+                                : 'Close'
                               : language === 'mr'
                               ? 'ऑफलाईन ऐका'
                               : 'Play Offline'}
@@ -562,14 +634,14 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
                         type="button"
                         disabled={isUploading}
                         onClick={() => handleTriggerFileUpload(song)}
-                        className="min-h-[38px] px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-950 text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap disabled:opacity-60"
+                        className="flex-1 min-w-0 min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-950 text-xs font-bold flex items-center justify-center gap-1.5 transition whitespace-nowrap disabled:opacity-60"
                       >
                         {saved ? (
                           <Music className="w-3.5 h-3.5 text-orange-700 shrink-0" />
                         ) : (
                           <Upload className="w-3.5 h-3.5 text-orange-700 shrink-0" />
                         )}
-                        <span>
+                        <span className="truncate">
                           {isUploading
                             ? language === 'mr'
                               ? 'सेव्ह होत आहे...'
@@ -577,7 +649,7 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
                             : saved
                             ? language === 'mr'
                               ? 'फाईल बदला'
-                              : 'Replace File'
+                              : 'Replace'
                             : language === 'mr'
                             ? 'MP3 / MP4 सेव्ह करा'
                             : 'Save MP3 / MP4'}
@@ -589,7 +661,7 @@ export const OfflineVaultModal: React.FC<OfflineVaultModalProps> = ({ isOpen, on
                           type="button"
                           onClick={() => handleDeleteSong(song.mediaId)}
                           aria-label={language === 'mr' ? 'फाईल काढा' : 'Remove saved file'}
-                          className="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold flex items-center gap-1 transition whitespace-nowrap"
+                          className="min-h-[44px] min-w-[44px] px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold flex items-center justify-center gap-1 transition whitespace-nowrap shrink-0"
                         >
                           <Trash2 className="w-3.5 h-3.5 shrink-0" />
                           <span className="hidden sm:inline">{language === 'mr' ? 'काढा' : 'Remove'}</span>

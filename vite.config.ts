@@ -4,8 +4,12 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  const buildId = mode === 'production' ? `build-${Date.now()}` : 'dev';
   return {
+    define: {
+      __APP_BUILD_ID__: JSON.stringify(buildId),
+    },
     plugins: [
       react(),
       tailwindcss(),
@@ -20,7 +24,7 @@ export default defineConfig(() => {
           theme_color: '#ea580c',
           background_color: '#fff7ed',
           display: 'standalone',
-          orientation: 'portrait',
+          orientation: 'any',
           start_url: '/',
           scope: '/',
           categories: ['lifestyle', 'utilities', 'books'],
