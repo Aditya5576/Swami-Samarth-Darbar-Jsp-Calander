@@ -26,15 +26,23 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('swami_app_lang') as Language;
-      if (saved === 'mr' || saved === 'en') return saved;
+      try {
+        const saved = window.localStorage.getItem('swami_app_lang') as Language;
+        if (saved === 'mr' || saved === 'en') return saved;
+      } catch {
+        // Fallback to default Marathi when browser storage is blocked
+      }
     }
     return 'mr'; // default authentic Marathi
   });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('swami_app_lang', language);
+      try {
+        window.localStorage.setItem('swami_app_lang', language);
+      } catch {
+        // Ignore blocked or full browser storage
+      }
       document.documentElement.lang = language;
     }
   }, [language]);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { DayData } from '../types/calendar';
 import { getMonthDays, getMonthGrid, getMonthMeta, getTodayDateInfo, SUPPORTED_YEARS, calculateRahuKaal, formatSunriseSunset } from '../utils/calendarLogic';
+import { hasSavedDayNote } from '../utils/dayNotesStorage';
 import { useLanguage } from '../context/LanguageContext';
 import {
   ChevronLeft,
@@ -262,9 +263,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
                 const isToday = day.date === todayInfo.dateStr;
                 const isSelected = selectedDateStr === day.date;
-                const hasSavedNote =
-                  typeof window !== 'undefined' &&
-                  !!localStorage.getItem(`swami_note_${day.date}`);
+                const hasSavedNote = hasSavedDayNote(day.date);
 
                 // Base cell styles with high contrast
                 let cellBg = 'bg-white hover:bg-orange-50/80 border-slate-200';

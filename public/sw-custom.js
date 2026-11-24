@@ -160,6 +160,16 @@ async function showDailyMorningNotification() {
   }
 }
 
+function replyToMessagePort(event, payload) {
+  try {
+    if (event.ports && event.ports[0] && typeof event.ports[0].postMessage === 'function') {
+      event.ports[0].postMessage(payload);
+    }
+  } catch {
+    // Ignore closed MessagePort errors
+  }
+}
+
 // Receive messages from main application window
 self.addEventListener('message', (event) => {
   if (!event.data) return;
@@ -170,37 +180,110 @@ self.addEventListener('message', (event) => {
   }
 
   if (event.data.type === 'TEST_BACKGROUND_NOTIFICATION') {
-    const delayMs = Math.min(Math.max(Number(event.data.delayMs) || 3000, 1000), 15000);
-    setTimeout(() => {
-      self.registration.showNotification(event.data.title || '॥ श्री स्वामी समर्थ ॥', {
-        body: event.data.body || 'चाचणी बॅकग्राउंड सूचना (बेस्ट-एफर्ट ब्राऊझर सूचना)',
-        icon: '/pwa-192x192.png',
-        badge: '/pwa-192x192.png',
-        tag: 'swami-test-bg-notif',
-        data: { url: '/' },
-      });
-    }, delayMs);
+    const rawDelay = Number(event.data.delayMs);
+    const delayMs = Number.isFinite(rawDelay)
+      ? Math.min(Math.max(rawDelay, 0), 15000)
+      : 3000;
+    const awaitDelivery = Boolean(event.data.awaitDelivery);
+
+    event.waitUntil(
+      (async () => {
+        if (
+          typeof self.Notification !== 'undefined' &&
+          self.Notification.permission !== 'granted'
+        ) {
+          replyToMessagePort(event, { ok: false, reason: 'permission_denied' });
+          return;
+        }
+
+        if (!self.registration || typeof self.registration.showNotification !== 'function') {
+          replyToMessagePort(event, { ok: false, reason: 'unsupported' });
+          return;
+        }
+
+        if (!awaitDelivery) {
+          replyToMessagePort(event, { ok: true, accepted: true });
+        }
+
+        if (delayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+
+        try {
+          await self.registration.showNotification(
+            event.data.title || '॥ श्री स्वामी समर्थ ॥',
+            {
+              body:
+                event.data.body ||
+                'चाचणी बॅकग्राउंड सूचना (बेस्ट-एफर्ट ब्राऊझर सूचना)',
+              icon: '/pwa-192x192.png',
+              badge: '/pwa-192x192.png',
+              tag: 'swami-test-bg-notif',
+              data: { url: '/' },
+            }
+          );
+          if (awaitDelivery) {
+            replyToMessagePort(event, { ok: true });
+          }
+        } catch (err) {
+          console.warn('Test background notification failed:', err);
+          if (awaitDelivery) {
+            replyToMessagePort(event, {
+              ok: false,
+              reason: 'failed',
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      })()
+    );
+    return;
   }
 
   if (event.data.type === 'SCHEDULE_DAY_ALARM') {
     const { title, body, timestamp, tag } = event.data;
-    try {
-      if (
-        typeof self.Notification !== 'undefined' &&
-        'showTrigger' in self.Notification.prototype &&
-        typeof self.TimestampTrigger !== 'undefined'
-      ) {
-        self.registration.showNotification(title, {
-          body,
-          icon: '/pwa-192x192.png',
-          badge: '/pwa-192x192.png',
-          tag: tag || `swami-alarm-${timestamp}`,
-          showTrigger: new self.TimestampTrigger(timestamp),
-          data: { url: '/' },
-        });
-      }
-    } catch (e) {
-      console.warn('TimestampTrigger not supported or failed:', e);
-    }
+
+    event.waitUntil(
+      (async () => {
+        if (
+          typeof self.Notification !== 'undefined' &&
+          self.Notification.permission !== 'granted'
+        ) {
+          replyToMessagePort(event, { ok: false, reason: 'permission_denied' });
+          return;
+        }
+
+        if (
+          typeof self.Notification === 'undefined' ||
+          !self.Notification.prototype ||
+          !('showTrigger' in self.Notification.prototype) ||
+          typeof self.TimestampTrigger === 'undefined' ||
+          !self.registration ||
+          typeof self.registration.showNotification !== 'function'
+        ) {
+          replyToMessagePort(event, { ok: false, reason: 'unsupported' });
+          return;
+        }
+
+        try {
+          await self.registration.showNotification(title, {
+            body,
+            icon: '/pwa-192x192.png',
+            badge: '/pwa-192x192.png',
+            tag: tag || `swami-alarm-${timestamp}`,
+            showTrigger: new self.TimestampTrigger(timestamp),
+            data: { url: '/' },
+          });
+          replyToMessagePort(event, { ok: true });
+        } catch (err) {
+          console.warn('TimestampTrigger registration failed:', err);
+          replyToMessagePort(event, {
+            ok: false,
+            reason: 'failed',
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      })()
+    );
   }
 });

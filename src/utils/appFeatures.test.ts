@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import http from 'node:http';
+import express from 'express';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -28,7 +30,19 @@ import {
   KUMUDINI_SEED_VIDEOS,
   isValidYouTubeVideoId,
 } from '../data/youtubeChannel';
-import { buildTodayNotificationMessage } from './notificationService';
+import {
+  buildTodayNotificationMessage,
+  scheduleFutureDailyAlarms,
+  testBackgroundNotification,
+} from './notificationService';
+import {
+  getDayNoteKey,
+  hasSavedDayNote,
+  readDayNote,
+  saveDayNote,
+  getDayNoteErrorMessage,
+} from './dayNotesStorage';
+import { streamBoundedImageDownload } from '../../server';
 import {
   validateMediaFile,
   formatBytes,
@@ -1070,4 +1084,504 @@ describe('Post-Splash Publish Update Popup & Faster Splash Timing', () => {
     assert.ok(appSrc.includes('<WhatsNewModal'), 'App.tsx must render WhatsNewModal');
   });
 });
+
+// ============================================================================
+// 11. KODEX AUDIT REMEDIATION SUITE (CAL-01, REL-01, REM-01, MED-01, DEV-01)
+// ============================================================================
+describe('Kodex Audit Remediation (CAL-01, REL-01, REM-01, MED-01, DEV-01)', () => {
+  it('CAL-01: preserves swami_note_ keys and survives throwing browser storage during calendar render and note save', () => {
+    const mem = createMemoryStorage();
+    assert.equal(getDayNoteKey('2026-04-03'), 'swami_note_2026-04-03');
+    assert.equal(hasSavedDayNote('2026-04-03', mem), false);
+
+    // Save and read back via exact swami_note_ key
+    assert.deepEqual(saveDayNote('2026-04-03', 'गुरुचरित्र पारायण संकल्प', mem), { ok: true });
+    assert.equal(mem.getItem('swami_note_2026-04-03'), 'गुरुचरित्र पारायण संकल्प');
+    assert.equal(hasSavedDayNote('2026-04-03', mem), true);
+    assert.deepEqual(readDayNote('2026-04-03', mem), {
+      note: 'गुरुचरित्र पारायण संकल्प',
+      storageAvailable: true,
+    });
+
+    // Throwing SecurityError storage
+    const securityErr = Object.assign(new Error('Storage denied'), { name: 'SecurityError' });
+    const deniedStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = {
+      getItem() {
+        throw securityErr;
+      },
+      setItem() {
+        throw securityErr;
+      },
+      removeItem() {
+        throw securityErr;
+      },
+    };
+
+    assert.equal(hasSavedDayNote('2026-04-03', deniedStorage), false);
+    assert.deepEqual(readDayNote('2026-04-03', deniedStorage), {
+      note: '',
+      storageAvailable: false,
+    });
+    assert.deepEqual(saveDayNote('2026-04-03', 'माझी नोंद', deniedStorage), {
+      ok: false,
+      reason: 'unavailable',
+    });
+
+    // QuotaExceededError classification + localized MR/EN error messages
+    const quotaErr = Object.assign(new Error('Quota full'), { name: 'QuotaExceededError' });
+    const fullStorage: Pick<Storage, 'setItem' | 'removeItem'> = {
+      setItem() {
+        throw quotaErr;
+      },
+      removeItem() {
+        throw quotaErr;
+      },
+    };
+    assert.deepEqual(saveDayNote('2026-04-03', 'माझी नोंद', fullStorage), {
+      ok: false,
+      reason: 'quota',
+    });
+    assert.ok(getDayNoteErrorMessage('unavailable', 'mr').includes('मजकूर येथे सुरक्षित आहे'));
+    assert.ok(getDayNoteErrorMessage('unavailable', 'en').includes('kept below'));
+    assert.ok(getDayNoteErrorMessage('quota', 'mr').includes('स्टोरेज भरले'));
+    assert.ok(getDayNoteErrorMessage('quota', 'en').includes('storage is full'));
+
+    // Force window.localStorage getter itself to throw during full React render of CalendarView & DayDetailsModal
+    const origWindow = (globalThis as Record<string, unknown>).window;
+    const origLocalStorage = (globalThis as Record<string, unknown>).localStorage;
+    const hostileWindow = {};
+    Object.defineProperty(hostileWindow, 'localStorage', {
+      configurable: true,
+      get() {
+        throw securityErr;
+      },
+    });
+    (globalThis as Record<string, unknown>).window = hostileWindow;
+    (globalThis as Record<string, unknown>).localStorage = deniedStorage;
+
+    try {
+      const noop = () => {};
+      const calHtml = renderToStaticMarkup(
+        React.createElement(
+          LanguageProvider,
+          null,
+          React.createElement(CalendarView, {
+            currentYear: 2026,
+            currentMonth: 4,
+            onChangeYear: noop,
+            onChangeMonth: noop,
+            onSelectDay: noop,
+            selectedDateStr: '2026-04-03',
+          })
+        )
+      );
+      assert.ok(calHtml.includes('2026'), 'CalendarView must render cleanly even when localStorage getter throws');
+
+      const day = getDayByDate('2026-04-03')!;
+      const modalHtml = renderToStaticMarkup(
+        React.createElement(
+          LanguageProvider,
+          null,
+          React.createElement(DayDetailsModal, { day, onClose: noop })
+        )
+      );
+      assert.ok(modalHtml.includes('id="day-note"'), 'DayDetailsModal must render cleanly even when localStorage throws');
+    } finally {
+      (globalThis as Record<string, unknown>).window = origWindow;
+      (globalThis as Record<string, unknown>).localStorage = origLocalStorage;
+    }
+  });
+
+  it('REM-01: binds SW background test to waitUntil, awaits alarm registration, and reports denied/unsupported/failed states honestly', async () => {
+    const swCode = fs.readFileSync(path.resolve(process.cwd(), 'public/sw-custom.js'), 'utf8');
+
+    function createRemSwEnv(opts: {
+      permission?: NotificationPermission;
+      hasTimestampTrigger?: boolean;
+      rejectShowNotification?: boolean;
+    }) {
+      const listeners = new Map<string, Array<(e: unknown) => void>>();
+      const shown: Array<{ title: string; options: Record<string, unknown> }> = [];
+      let waitUntilCalled = 0;
+
+      function MockNotification() {}
+      if (opts.hasTimestampTrigger) {
+        (MockNotification.prototype as Record<string, unknown>).showTrigger = null;
+      }
+      (MockNotification as unknown as { permission: NotificationPermission }).permission =
+        opts.permission ?? 'granted';
+
+      class MockTimestampTrigger {
+        timestamp: number;
+        constructor(ts: number) {
+          this.timestamp = ts;
+        }
+      }
+
+      const selfObj: Record<string, unknown> = {
+        Notification: MockNotification,
+        TimestampTrigger: opts.hasTimestampTrigger ? MockTimestampTrigger : undefined,
+        addEventListener(type: string, fn: (e: unknown) => void) {
+          const arr = listeners.get(type) ?? [];
+          arr.push(fn);
+          listeners.set(type, arr);
+        },
+        registration: {
+          async showNotification(title: string, options: Record<string, unknown>) {
+            if (opts.rejectShowNotification) {
+              throw new Error('OS rejected alarm registration');
+            }
+            shown.push({ title, options });
+          },
+        },
+      };
+
+      const context = vm.createContext({
+        self: selfObj,
+        console: { ...console, warn: () => {}, error: () => {} },
+        setTimeout,
+        clearTimeout,
+      });
+      vm.runInContext(swCode, context, { filename: 'public/sw-custom.js' });
+
+      const dispatchMessage = async (data: Record<string, unknown>) => {
+        const replies: Array<Record<string, unknown>> = [];
+        const promises: Promise<unknown>[] = [];
+        const event = {
+          data,
+          ports: [
+            {
+              postMessage(msg: Record<string, unknown>) {
+                replies.push({ ...msg });
+              },
+            },
+          ],
+          waitUntil(p: Promise<unknown>) {
+            waitUntilCalled++;
+            promises.push(Promise.resolve(p));
+          },
+        };
+        for (const fn of listeners.get('message') ?? []) {
+          fn(event);
+        }
+        await Promise.all(promises);
+        return { replies, waitUntilCalled };
+      };
+
+      return { shown, dispatchMessage };
+    }
+
+    // 1. TEST_BACKGROUND_NOTIFICATION is tied to event.waitUntil() and awaits delivery
+    const bgOk = createRemSwEnv({ permission: 'granted' });
+    const bgRes = await bgOk.dispatchMessage({
+      type: 'TEST_BACKGROUND_NOTIFICATION',
+      delayMs: 25,
+      awaitDelivery: true,
+      title: 'Test Title',
+      body: 'Test Body',
+    });
+    assert.equal(bgRes.waitUntilCalled, 1, 'TEST_BACKGROUND_NOTIFICATION must call event.waitUntil()');
+    assert.equal(bgOk.shown.length, 1, 'Notification must be delivered before waitUntil settles');
+    assert.deepEqual(bgRes.replies, [{ ok: true }]);
+
+    // 2. Denied permission -> reports permission_denied and shows 0 notifications
+    const bgDenied = createRemSwEnv({ permission: 'denied' });
+    const deniedRes = await bgDenied.dispatchMessage({
+      type: 'TEST_BACKGROUND_NOTIFICATION',
+      delayMs: 10,
+      awaitDelivery: true,
+    });
+    assert.equal(bgDenied.shown.length, 0);
+    assert.deepEqual(deniedRes.replies, [{ ok: false, reason: 'permission_denied' }]);
+
+    // 3. SCHEDULE_DAY_ALARM: denied permission
+    const alarmDenied = createRemSwEnv({ permission: 'denied', hasTimestampTrigger: true });
+    const alarmDeniedRes = await alarmDenied.dispatchMessage({
+      type: 'SCHEDULE_DAY_ALARM',
+      title: 'Morning',
+      body: 'Swami',
+      timestamp: Date.now() + 60_000,
+    });
+    assert.equal(alarmDenied.shown.length, 0);
+    assert.deepEqual(alarmDeniedRes.replies, [{ ok: false, reason: 'permission_denied' }]);
+
+    // 4. SCHEDULE_DAY_ALARM: unavailable TimestampTrigger support
+    const alarmUnsupported = createRemSwEnv({ permission: 'granted', hasTimestampTrigger: false });
+    const alarmUnsupportedRes = await alarmUnsupported.dispatchMessage({
+      type: 'SCHEDULE_DAY_ALARM',
+      title: 'Morning',
+      body: 'Swami',
+      timestamp: Date.now() + 60_000,
+    });
+    assert.equal(alarmUnsupported.shown.length, 0);
+    assert.deepEqual(alarmUnsupportedRes.replies, [{ ok: false, reason: 'unsupported' }]);
+
+    // 5. SCHEDULE_DAY_ALARM: async showNotification rejection is caught and reported as failed
+    const alarmRejected = createRemSwEnv({
+      permission: 'granted',
+      hasTimestampTrigger: true,
+      rejectShowNotification: true,
+    });
+    const alarmRejectedRes = await alarmRejected.dispatchMessage({
+      type: 'SCHEDULE_DAY_ALARM',
+      title: 'Morning',
+      body: 'Swami',
+      timestamp: Date.now() + 60_000,
+    });
+    assert.equal(alarmRejectedRes.waitUntilCalled, 1);
+    assert.equal(alarmRejected.shown.length, 0);
+    assert.equal(alarmRejectedRes.replies[0]?.ok, false);
+    assert.equal(alarmRejectedRes.replies[0]?.reason, 'failed');
+
+    // 6. SCHEDULE_DAY_ALARM: accepted registration returns ok: true
+    const alarmAccepted = createRemSwEnv({ permission: 'granted', hasTimestampTrigger: true });
+    const alarmAcceptedRes = await alarmAccepted.dispatchMessage({
+      type: 'SCHEDULE_DAY_ALARM',
+      title: 'Morning',
+      body: 'Swami',
+      timestamp: Date.now() + 60_000,
+    });
+    assert.equal(alarmAccepted.shown.length, 1);
+    assert.deepEqual(alarmAcceptedRes.replies, [{ ok: true }]);
+
+    // 7. Client-side notificationService checks denied permission & unsupported triggers
+    const origWindow = (globalThis as Record<string, unknown>).window;
+    const origNotification = (globalThis as Record<string, unknown>).Notification;
+    const origNavigator = (globalThis as Record<string, unknown>).navigator;
+
+    try {
+      function FakeNotif() {}
+      (FakeNotif as unknown as { permission: NotificationPermission }).permission = 'denied';
+      (globalThis as Record<string, unknown>).Notification = FakeNotif;
+      (globalThis as Record<string, unknown>).window = { Notification: FakeNotif };
+      Object.defineProperty(globalThis, 'navigator', {
+        configurable: true,
+        value: { serviceWorker: {} },
+      });
+
+      const deniedSched = await scheduleFutureDailyAlarms(1, '06:00', 'mr');
+      assert.equal(deniedSched.status, 'permission_denied');
+      assert.equal(deniedSched.scheduledCount, 0);
+
+      const deniedBg = await testBackgroundNotification(5, 'mr');
+      assert.equal(deniedBg.ok, false);
+      assert.equal(deniedBg.reason, 'permission_denied');
+
+      // Granted permission, but TimestampTrigger unavailable
+      (FakeNotif as unknown as { permission: NotificationPermission }).permission = 'granted';
+      const unsupportedSched = await scheduleFutureDailyAlarms(1, '06:00', 'en');
+      assert.equal(unsupportedSched.status, 'unsupported');
+      assert.equal(unsupportedSched.scheduledCount, 0);
+    } finally {
+      (globalThis as Record<string, unknown>).window = origWindow;
+      (globalThis as Record<string, unknown>).Notification = origNotification;
+      Object.defineProperty(globalThis, 'navigator', {
+        configurable: true,
+        value: origNavigator,
+      });
+    }
+  });
+
+  it('MED-01: streams ordinary photos, enforces byte cap with or without Content-Length, aborts on disconnect, and separates timeout vs upstream error', async () => {
+    let disconnectAborted = false;
+    let chunkedOversizeAborted = false;
+
+    const app = express();
+    app.get('/ordinary', (req, res) =>
+      streamBoundedImageDownload(req, res, {
+        url: 'https://example.invalid/photo.jpg',
+        fileNamePrefix: 'test-darshan-1',
+        maxBytes: 1024,
+        timeoutMs: 2000,
+        fetchImpl: (async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]));
+                controller.enqueue(new Uint8Array([1, 2, 3, 4, 5, 6]));
+                controller.close();
+              },
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'image/jpeg', 'content-length': '10' },
+            }
+          )) as typeof fetch,
+      })
+    );
+
+    app.get('/oversized-header', (req, res) =>
+      streamBoundedImageDownload(req, res, {
+        url: 'https://example.invalid/huge.jpg',
+        fileNamePrefix: 'test-darshan-2',
+        maxBytes: 100,
+        timeoutMs: 2000,
+        fetchImpl: (async () =>
+          new Response(new Uint8Array(200), {
+            status: 200,
+            headers: { 'content-type': 'image/jpeg', 'content-length': '200' },
+          })) as typeof fetch,
+      })
+    );
+
+    app.get('/oversized-chunked', (req, res) =>
+      streamBoundedImageDownload(req, res, {
+        url: 'https://example.invalid/huge-chunked.jpg',
+        fileNamePrefix: 'test-darshan-3',
+        maxBytes: 100,
+        timeoutMs: 2000,
+        fetchImpl: (async (_url, init) => {
+          init?.signal?.addEventListener('abort', () => {
+            chunkedOversizeAborted = true;
+          });
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(new Uint8Array(150));
+                controller.close();
+              },
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'image/jpeg' }, // No Content-Length!
+            }
+          );
+        }) as typeof fetch,
+      })
+    );
+
+    app.get('/timeout', (req, res) =>
+      streamBoundedImageDownload(req, res, {
+        url: 'https://example.invalid/slow.jpg',
+        fileNamePrefix: 'test-darshan-4',
+        maxBytes: 1024,
+        timeoutMs: 60,
+        fetchImpl: ((_url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new Error('Aborted')));
+          })) as typeof fetch,
+      })
+    );
+
+    app.get('/upstream-error', (req, res) =>
+      streamBoundedImageDownload(req, res, {
+        url: 'https://example.invalid/down.jpg',
+        fileNamePrefix: 'test-darshan-5',
+        maxBytes: 1024,
+        timeoutMs: 2000,
+        fetchImpl: (async () => {
+          throw new TypeError('ECONNREFUSED');
+        }) as typeof fetch,
+      })
+    );
+
+    app.get('/interrupt', (req, res) =>
+      streamBoundedImageDownload(req, res, {
+        url: 'https://example.invalid/stream.jpg',
+        fileNamePrefix: 'test-darshan-6',
+        maxBytes: 1024 * 1024,
+        timeoutMs: 5000,
+        fetchImpl: (async (_url, init) => {
+          init?.signal?.addEventListener('abort', () => {
+            disconnectAborted = true;
+          });
+          let sent = 0;
+          return new Response(
+            new ReadableStream({
+              async pull(controller) {
+                if (init?.signal?.aborted) {
+                  controller.close();
+                  return;
+                }
+                controller.enqueue(new Uint8Array(32).fill(7));
+                sent++;
+                if (sent >= 50) {
+                  controller.close();
+                  return;
+                }
+                await new Promise(r => setTimeout(r, 40));
+              },
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'image/jpeg' },
+            }
+          );
+        }) as typeof fetch,
+      })
+    );
+
+    const server = await new Promise<http.Server>((resolve) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    });
+
+    try {
+      const addr = server.address() as { port: number };
+      const baseUrl = `http://127.0.0.1:${addr.port}`;
+
+      // 1. Ordinary photo
+      const okRes = await fetch(`${baseUrl}/ordinary`);
+      assert.equal(okRes.status, 200);
+      assert.equal(okRes.headers.get('content-type'), 'image/jpeg');
+      assert.ok(okRes.headers.get('content-disposition')?.includes('test-darshan-1.jpg'));
+      assert.equal(okRes.headers.get('x-content-type-options'), 'nosniff');
+      const okBytes = new Uint8Array(await okRes.arrayBuffer());
+      assert.equal(okBytes.length, 10);
+
+      // 2. Oversized with Content-Length -> 413
+      const overHdrRes = await fetch(`${baseUrl}/oversized-header`);
+      assert.equal(overHdrRes.status, 413);
+
+      // 3. Oversized without Content-Length -> 413 & upstream aborted
+      const overChunkRes = await fetch(`${baseUrl}/oversized-chunked`);
+      assert.equal(overChunkRes.status, 413);
+      assert.equal(chunkedOversizeAborted, true, 'Chunked oversize response must abort upstream fetch');
+
+      // 4. Timeout -> 504
+      const timeoutRes = await fetch(`${baseUrl}/timeout`);
+      assert.equal(timeoutRes.status, 504);
+
+      // 5. Upstream network failure -> 502 (distinct from 504 timeout!)
+      const errRes = await fetch(`${baseUrl}/upstream-error`);
+      assert.equal(errRes.status, 502);
+
+      // 6. Interrupted client transfer aborts upstream request promptly
+      await new Promise<void>((resolve, reject) => {
+        const req = http.get(`${baseUrl}/interrupt`, (res) => {
+          res.once('data', () => {
+            req.destroy();
+            setTimeout(() => resolve(), 80);
+          });
+        });
+        req.on('error', () => {
+          // Expected ECONNRESET after client destroy
+        });
+        setTimeout(() => reject(new Error('Interrupt test timed out')), 2000);
+      });
+      assert.equal(disconnectAborted, true, 'Client disconnect must abort upstream photo fetch');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('REL-01 & DEV-01: declares supported Node runtime and uses a cross-platform clean script', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')) as {
+      engines?: { node?: string };
+      scripts?: { clean?: string; start?: string };
+    };
+
+    assert.ok(pkg.engines?.node, 'package.json must declare engines.node');
+    assert.equal(pkg.scripts?.start, 'node server.ts');
+    assert.ok(pkg.scripts?.clean, 'package.json must define a clean script');
+    assert.ok(
+      !pkg.scripts!.clean!.includes('rm -rf'),
+      'clean script must not depend on Unix-only rm -rf'
+    );
+    assert.ok(
+      pkg.scripts!.clean!.includes('fs.rmSync'),
+      'clean script should use Node cross-platform fs.rmSync'
+    );
+  });
+});
+
 

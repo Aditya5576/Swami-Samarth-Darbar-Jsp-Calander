@@ -15,8 +15,10 @@ import {
   Share2,
   Clock,
   Info,
+  AlertCircle,
 } from 'lucide-react';
 import { calculateRahuKaal, formatSunriseSunset } from '../utils/calendarLogic';
+import { readDayNote, saveDayNote, getDayNoteErrorMessage } from '../utils/dayNotesStorage';
 
 interface DayDetailsModalProps {
   day: DayData | null;
@@ -32,23 +34,30 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
   const { language, t, formatDate, getDayName } = useLanguage();
   const [userNote, setUserNote] = useState('');
   const [isSaved, setIsSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const dialogRef = useDialogA11y(Boolean(day), onClose);
 
   useEffect(() => {
     if (day) {
-      const saved = localStorage.getItem(`swami_note_${day.date}`);
-      setUserNote(saved || '');
+      const { note } = readDayNote(day.date);
+      setUserNote(note);
       setIsSaved(false);
+      setSaveError(null);
     }
   }, [day]);
 
   if (!day) return null;
 
   const handleSaveNote = () => {
-    if (day) {
-      localStorage.setItem(`swami_note_${day.date}`, userNote);
+    if (!day) return;
+    const result = saveDayNote(day.date, userNote);
+    if (result.ok) {
+      setSaveError(null);
       setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 2000);
+      window.setTimeout(() => setIsSaved(false), 2000);
+    } else {
+      setIsSaved(false);
+      setSaveError(getDayNoteErrorMessage(result.reason, language));
     }
   };
 
@@ -349,7 +358,10 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
                 id="day-note"
                 type="text"
                 value={userNote}
-                onChange={e => setUserNote(e.target.value)}
+                onChange={e => {
+                  setUserNote(e.target.value);
+                  if (saveError) setSaveError(null);
+                }}
                 placeholder={t('personalNotePlaceholder')}
                 className="flex-1 min-w-0 min-h-[44px] rounded-xl border border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
               />
@@ -362,6 +374,15 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
                 <span>{t('save')}</span>
               </button>
             </div>
+            {saveError && (
+              <div
+                role="alert"
+                className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 flex items-start gap-2 text-xs font-semibold text-rose-900 leading-snug"
+              >
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{saveError}</span>
+              </div>
+            )}
           </div>
         </div>
 

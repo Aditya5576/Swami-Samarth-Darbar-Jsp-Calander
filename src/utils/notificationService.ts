@@ -20,6 +20,18 @@ export interface NotificationCapabilities {
   timestampTrigger: boolean;
 }
 
+export interface AlarmScheduleResult {
+  scheduledCount: number;
+  status: 'scheduled' | 'permission_denied' | 'unsupported' | 'failed';
+  error?: string;
+}
+
+export interface BackgroundTestResult {
+  ok: boolean;
+  reason?: 'permission_denied' | 'unsupported' | 'no_service_worker' | 'failed';
+  error?: string;
+}
+
 const SETTINGS_KEY = 'swami_daily_notif_settings';
 const NOTIF_PREFS_DB = 'swami_notif_prefs_v1';
 const NOTIF_PREFS_STORE = 'prefs';
@@ -376,19 +388,92 @@ export async function unregisterPeriodicDailySync(): Promise<boolean> {
   return false;
 }
 
+interface SwMessageReply {
+  ok: boolean;
+  accepted?: boolean;
+  reason?: 'permission_denied' | 'unsupported' | 'failed';
+  error?: string;
+}
+
+function postMessageWithReply(
+  worker: ServiceWorker,
+  payload: Record<string, unknown>,
+  timeoutMs = 3500
+): Promise<SwMessageReply | null> {
+  if (typeof MessageChannel === 'undefined') {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    let settled = false;
+
+    const finish = (value: SwMessageReply | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      channel.port1.onmessage = null;
+      try {
+        channel.port1.close();
+      } catch {
+        // ignore close error
+      }
+      resolve(value);
+    };
+
+    const timer = window.setTimeout(() => finish(null), timeoutMs);
+    channel.port1.onmessage = (evt: MessageEvent<SwMessageReply>) => {
+      finish(evt.data ?? null);
+    };
+
+    try {
+      worker.postMessage(payload, [channel.port2]);
+    } catch (err) {
+      finish({
+        ok: false,
+        reason: 'failed',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+}
+
 /**
  * Best-effort future daily notification scheduling where TimestampTrigger is supported.
+ * Explicitly distinguishes permission denied, unsupported browser capability, and rejected registration.
  */
 export async function scheduleFutureDailyAlarms(
   daysAhead = 7,
   time = '06:00',
   lang: 'mr' | 'en' = 'mr'
-): Promise<number> {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return 0;
+): Promise<AlarmScheduleResult> {
+  if (typeof window === 'undefined' || !isNotificationSupported()) {
+    return { scheduledCount: 0, status: 'unsupported' };
+  }
+
+  if (Notification.permission !== 'granted') {
+    return { scheduledCount: 0, status: 'permission_denied' };
+  }
+
+  if (!('serviceWorker' in navigator)) {
+    return { scheduledCount: 0, status: 'unsupported' };
+  }
+
+  const TimestampTriggerClass = (window as unknown as {
+    TimestampTrigger?: new (ts: number) => unknown;
+  }).TimestampTrigger;
+  const hasTriggerSupport =
+    'showTrigger' in Notification.prototype && Boolean(TimestampTriggerClass);
+
+  if (!hasTriggerSupport) {
+    return { scheduledCount: 0, status: 'unsupported' };
+  }
+
   try {
     const registration = await navigator.serviceWorker.ready;
     const [hours, minutes] = time.split(':').map(Number);
     let count = 0;
+    let lastFailureReason: 'permission_denied' | 'unsupported' | 'failed' | undefined;
+    let lastError: string | undefined;
 
     const now = new Date();
     for (let i = 1; i <= daysAhead; i++) {
@@ -406,40 +491,88 @@ export async function scheduleFutureDailyAlarms(
           ? 'आजचे पंचांग व नित्यसेवा स्मरण. "भिऊ नकोस मी तुझ्या पाठीशी आहे."'
           : "Today's Panchang & Nitya Seva. \"Fear not, I am with you.\"";
 
-      const TimestampTriggerClass = (window as unknown as {
-        TimestampTrigger?: new (ts: number) => unknown;
-      }).TimestampTrigger;
-      if ('Notification' in window && 'showTrigger' in Notification.prototype && TimestampTriggerClass) {
-        try {
-          await registration.showNotification(title, {
-            body,
-            icon: '/pwa-192x192.png',
-            badge: '/pwa-192x192.png',
-            tag: `swami-alarm-${dateStr}`,
-            showTrigger: new TimestampTriggerClass(targetDate.getTime()),
-            data: { url: '/', date: dateStr },
-          } as NotificationOptions);
+      if (registration.active && typeof MessageChannel !== 'undefined') {
+        const reply = await postMessageWithReply(registration.active, {
+          type: 'SCHEDULE_DAY_ALARM',
+          title,
+          body,
+          timestamp: targetDate.getTime(),
+          tag: `swami-alarm-${dateStr}`,
+        });
+
+        if (reply?.ok) {
           count++;
-        } catch (e) {
-          console.warn('TimestampTrigger register failed for date:', dateStr, e);
+          continue;
         }
+        if (reply && !reply.ok) {
+          lastFailureReason = reply.reason || 'failed';
+          lastError = reply.error;
+          if (lastFailureReason === 'permission_denied' || lastFailureReason === 'unsupported') {
+            break;
+          }
+          continue;
+        }
+      }
+
+      try {
+        await registration.showNotification(title, {
+          body,
+          icon: '/pwa-192x192.png',
+          badge: '/pwa-192x192.png',
+          tag: `swami-alarm-${dateStr}`,
+          showTrigger: new TimestampTriggerClass!(targetDate.getTime()),
+          data: { url: '/', date: dateStr },
+        } as NotificationOptions);
+        count++;
+      } catch (e) {
+        console.warn('TimestampTrigger register failed for date:', dateStr, e);
+        lastFailureReason = 'failed';
+        lastError = e instanceof Error ? e.message : String(e);
       }
     }
 
-    return count;
+    if (count > 0) {
+      return { scheduledCount: count, status: 'scheduled' };
+    }
+    if (lastFailureReason === 'permission_denied') {
+      return { scheduledCount: 0, status: 'permission_denied', error: lastError };
+    }
+    if (lastFailureReason === 'unsupported') {
+      return { scheduledCount: 0, status: 'unsupported', error: lastError };
+    }
+    return { scheduledCount: 0, status: 'failed', error: lastError };
   } catch (err) {
     console.warn('Failed scheduling future daily alarms:', err);
-    return 0;
+    return {
+      scheduledCount: 0,
+      status: 'failed',
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
 export async function testBackgroundNotification(
   delaySeconds = 5,
   lang: 'mr' | 'en' = 'mr'
-): Promise<boolean> {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
+): Promise<BackgroundTestResult> {
+  if (typeof window === 'undefined' || !isNotificationSupported()) {
+    return { ok: false, reason: 'unsupported' };
+  }
+
+  if (Notification.permission !== 'granted') {
+    return { ok: false, reason: 'permission_denied' };
+  }
+
+  if (!('serviceWorker' in navigator)) {
+    return { ok: false, reason: 'no_service_worker' };
+  }
+
   try {
     const registration = await navigator.serviceWorker.ready;
+    if (!registration?.active) {
+      return { ok: false, reason: 'no_service_worker' };
+    }
+
     const title =
       lang === 'mr'
         ? '॥ श्री स्वामी समर्थ ॥ चाचणी सूचना'
@@ -449,19 +582,30 @@ export async function testBackgroundNotification(
         ? 'सेवा केंद्राची चाचणी सूचना यशस्वीरीत्या आली! "भिऊ नकोस मी तुझ्या पाठीशी आहे."'
         : 'Test alert received successfully! "Fear not, I am with you."';
 
-    if (registration.active) {
-      registration.active.postMessage({
-        type: 'TEST_BACKGROUND_NOTIFICATION',
-        delayMs: delaySeconds * 1000,
-        title,
-        body,
-      });
-      return true;
+    const reply = await postMessageWithReply(registration.active, {
+      type: 'TEST_BACKGROUND_NOTIFICATION',
+      delayMs: delaySeconds * 1000,
+      title,
+      body,
+    });
+
+    if (reply?.ok) {
+      return { ok: true };
     }
+
+    return {
+      ok: false,
+      reason: reply?.reason || 'failed',
+      error: reply?.error,
+    };
   } catch (e) {
     console.warn('Test background notification failed:', e);
+    return {
+      ok: false,
+      reason: 'failed',
+      error: e instanceof Error ? e.message : String(e),
+    };
   }
-  return false;
 }
 
 /**
@@ -543,10 +687,14 @@ export function getCustomTimerState(): CustomTimerState | null {
 
 export function saveCustomTimerState(state: CustomTimerState | null): void {
   if (typeof window === 'undefined') return;
-  if (!state) {
-    localStorage.removeItem(CUSTOM_TIMER_KEY);
-  } else {
-    localStorage.setItem(CUSTOM_TIMER_KEY, JSON.stringify(state));
+  try {
+    if (!state) {
+      localStorage.removeItem(CUSTOM_TIMER_KEY);
+    } else {
+      localStorage.setItem(CUSTOM_TIMER_KEY, JSON.stringify(state));
+    }
+  } catch {
+    // Ignore blocked or full storage errors
   }
 }
 

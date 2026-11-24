@@ -4,13 +4,16 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "dev": "tsx server.ts --dev",
     "start": "node server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "test": "tsx --test src/utils/calendarLogic.test.ts src/utils/appFeatures.test.ts",
-    "clean": "rm -rf dist server.js",
+    "clean": "node --input-type=module -e \"import fs from 'node:fs'; for (const target of ['dist', 'server.js']) fs.rmSync(target, { recursive: true, force: true });\"",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

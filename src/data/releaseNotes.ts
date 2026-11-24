@@ -25,35 +25,35 @@ export const RELEASE_SEEN_STORAGE_KEY = 'swami_seen_release_key_v1';
  * so every republish automatically triggers the post-splash update popup once.
  */
 export const LATEST_RELEASE: AppReleaseNote = {
-  version: '2.4.1',
+  version: '2.4.2',
   dateMr: 'नवीन आवृत्ती',
   dateEn: 'Latest Release',
   summaryMr: 'सेवेकऱ्यांच्या सोयीसाठी खालील नवीन सुविधा व सुधारणा केल्या आहेत:',
   summaryEn: 'Here is what we upgraded and fixed in this update:',
   items: [
     {
+      id: 'storage-and-reliability',
+      kind: 'fix',
+      mr: 'ब्राऊझर स्टोरेज बंद असल्यासही कॅलेंडर व नोंदी सुरक्षित चालतात; नोंद सेव्ह न झाल्यास मजकूर जतन राहतो.',
+      en: 'Protected calendar notes and language state when browser storage is restricted, preserving typed notes on save failure.',
+    },
+    {
+      id: 'reminder-and-download-hardening',
+      kind: 'upgrade',
+      mr: 'बॅकग्राउंड स्मरणपत्र नोंदणीची अचूक पडताळणी व सुरक्षित स्ट्रीमिंग फोटो डाऊनलोड सुविधा.',
+      en: 'Verified background reminder scheduling feedback and upgraded Darshan photo downloads to bounded streaming.',
+    },
+    {
       id: 'mobile-text-wrap-fix',
       kind: 'fix',
-      mr: 'सर्व मोबाईल स्क्रीनवर शीर्षके, बटणे, वेळा व बॅजेस आता एकाच ओळीत नीटनेटके दिसतात — मजकूर तुटण्याची अडचण दूर केली.',
-      en: 'Fixed awkward text, button, header, and badge wrapping across all mobile screens for crisp single-line alignment.',
+      mr: 'सर्व मोबाईल स्क्रीनवर शीर्षके, बटणे, वेळा व बॅजेस आता एकाच ओळीत नीटनेटके दिसतात.',
+      en: 'Crisp single-line alignment for headers, buttons, timings, and badges across all mobile screens.',
     },
     {
       id: 'darshan-gallery',
       kind: 'upgrade',
       mr: 'दर्शन गॅलरीमध्ये स्लाईडशो, पूर्ण स्क्रीन झूम व एक-टॅप फोटो डाऊनलोड सुविधा.',
       en: 'Darshan Gallery with swipeable slideshow, fullscreen viewer, and 1-tap Sevak photo download.',
-    },
-    {
-      id: 'mobile-layout',
-      kind: 'fix',
-      mr: 'सर्व Android व iPhone स्क्रीनसाठी अचूक लेआउट — ओव्हरलॅप, नॉच कटिंग व झूम अडचणी दूर केल्या.',
-      en: 'Fixed mobile overlap, notch safe-areas, iOS focus zoom, and 44px touch targets on Android & iOS.',
-    },
-    {
-      id: 'offline-notifications',
-      kind: 'fix',
-      mr: 'ऑफलाईन सेवा तयारी तपासणी, दैनिक स्मरणपत्रे व जलद दर्शन स्प्लॅश स्क्रीन सुधारणा.',
-      en: 'Honest offline readiness checks, accurate reminder schedules, and faster splash screen startup.',
     },
   ],
 };

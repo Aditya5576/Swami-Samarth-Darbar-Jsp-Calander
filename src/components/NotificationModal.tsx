@@ -168,7 +168,16 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     setErrorMessage(null);
     setScheduleSuccessMsg(null);
 
-    if (isNotificationSupported() && Notification.permission !== 'granted') {
+    if (!isNotificationSupported()) {
+      setErrorMessage(
+        language === 'mr'
+          ? 'या ब्राऊझरमध्ये नोटिफिकेशन सुविधा उपलब्ध नाही.'
+          : 'Notifications are not supported in this browser.'
+      );
+      return;
+    }
+
+    if (Notification.permission !== 'granted') {
       const res = await requestNotificationPermission(language);
       setPermission(res);
       if (res !== 'granted') {
@@ -186,21 +195,39 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     saveNotificationSettings(updated);
 
     const periodicOk = await registerPeriodicDailySync();
-    const scheduledCount = await scheduleFutureDailyAlarms(7, settings.time, language);
+    const alarmResult = await scheduleFutureDailyAlarms(7, settings.time, language);
     void getNotificationCapabilities().then(setCapabilities);
 
+    if (alarmResult.status === 'permission_denied') {
+      setErrorMessage(
+        language === 'mr'
+          ? 'नोटिफिकेशन परवानगी नाकारली आहे. ब्राऊझर सेटिंग्जमधून परवानगी सुरू करा.'
+          : 'Notification permission is denied. Enable notifications in browser settings.'
+      );
+      return;
+    }
+
+    if (alarmResult.status === 'failed' && !periodicOk) {
+      setErrorMessage(
+        language === 'mr'
+          ? 'बॅकग्राउंड स्मरणपत्र नोंदणी अयशस्वी झाली. कृपया पुन्हा प्रयत्न करा किंवा अ‍ॅप उघडे असताना स्मरणपत्र वापरा.'
+          : 'Background reminder registration was rejected by the browser. Please retry or use in-app reminders.'
+      );
+      return;
+    }
+
     setScheduleSuccessMsg(
-      scheduledCount > 0
+      alarmResult.status === 'scheduled' && alarmResult.scheduledCount > 0
         ? language === 'mr'
-          ? `✅ पुढील ${scheduledCount} दिवसांचे स्मरणपत्र (${settings.time}) शेड्यूल झाले (ब्राऊझर क्षमतेनुसार बेस्ट-एफर्ट).`
-          : `✅ Scheduled ${scheduledCount} daily reminders (${settings.time}) via browser triggers (best-effort).`
+          ? `✅ पुढील ${alarmResult.scheduledCount} दिवसांचे स्मरणपत्र (${settings.time}) शेड्यूल झाले (ब्राऊझर क्षमतेनुसार बेस्ट-एफर्ट).`
+          : `✅ Scheduled ${alarmResult.scheduledCount} daily reminders (${settings.time}) via browser triggers (best-effort).`
         : periodicOk
         ? language === 'mr'
           ? `✅ प्राधान्ये (${settings.time}) सेव्ह झाली व Periodic Background Sync नोंदणी झाली. अ‍ॅप उघडे असताना किंवा ब्राऊझरने परवानगी दिल्यास सूचना येईल.`
-          : `✅ Preferences (${settings.time}) saved and Periodic Sync registered. Reminders run best-effort based on browser/OS policy.`
+          : `✅ Preferences (${settings.time}) saved and Periodic Sync registered. Exact background triggers are unsupported on this browser, so reminders run best-effort.`
         : language === 'mr'
-        ? `✅ प्राधान्ये (${settings.time}) सेव्ह झाली. या ब्राऊझरमध्ये अ‍ॅप उघडल्यावर किंवा सक्रिय असताना स्मरणपत्र दाखवले जाईल.`
-        : `✅ Preferences (${settings.time}) saved. On this browser, reminders trigger when the app is open (best-effort).`
+        ? `ℹ️ प्राधान्ये (${settings.time}) सेव्ह झाली. या ब्राऊझरमध्ये बॅकग्राउंड अलार्म शेड्युलिंग उपलब्ध नाही; अ‍ॅप उघडे असताना स्मरणपत्र दाखवले जाईल.`
+        : `ℹ️ Preferences (${settings.time}) saved. Background alarm triggers are not supported on this browser; reminders will appear while the app is open.`
     );
     setTimeout(() => setScheduleSuccessMsg(null), 6500);
   };
@@ -209,8 +236,17 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     setErrorMessage(null);
     setTestSent(false);
 
-    if (isNotificationSupported() && Notification.permission !== 'granted') {
-      const res = await requestNotificationPermission();
+    if (!isNotificationSupported()) {
+      setErrorMessage(
+        language === 'mr'
+          ? 'या ब्राऊझरमध्ये नोटिफिकेशन सुविधा उपलब्ध नाही.'
+          : 'Notifications are not supported in this browser.'
+      );
+      return;
+    }
+
+    if (Notification.permission !== 'granted') {
+      const res = await requestNotificationPermission(language);
       setPermission(res);
       if (res !== 'granted') {
         setErrorMessage(
@@ -222,7 +258,28 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
       }
     }
 
-    testBackgroundNotification(5, language);
+    const result = await testBackgroundNotification(5, language);
+    if (!result.ok) {
+      setErrorMessage(
+        result.reason === 'permission_denied'
+          ? language === 'mr'
+            ? 'नोटिफिकेशन परवानगी नाकारली आहे. कृपया ब्राऊझर सेटिंग्जमध्ये परवानगी द्या.'
+            : 'Notification permission is denied. Please enable it in browser settings.'
+          : result.reason === 'no_service_worker'
+          ? language === 'mr'
+            ? 'सर्व्हिस वर्कर अद्याप सक्रिय नाही. कृपया पान रिफ्रेश करून पुन्हा प्रयत्न करा.'
+            : 'Background service worker is not active yet. Please reload the app and try again.'
+          : result.reason === 'unsupported'
+          ? language === 'mr'
+            ? 'या ब्राऊझरमध्ये बॅकग्राउंड चाचणी सूचना उपलब्ध नाही.'
+            : 'Background test notifications are not supported on this browser.'
+          : language === 'mr'
+          ? 'बॅकग्राउंड चाचणी सूचना सुरू करता आली नाही. कृपया पुन्हा प्रयत्न करा.'
+          : 'Background test notification request was not accepted. Please try again.'
+      );
+      return;
+    }
+
     setBgTestCountdown(5);
 
     const timer = setInterval(() => {

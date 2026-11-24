@@ -29,6 +29,7 @@ const TEMPLE_ALBUM_SHARE_URL = 'https://photos.app.goo.gl/Wi3gkoXLGPUSQeeX7';
 const TEMPLE_ALBUM_TITLE = 'Swami Samarth Darbar';
 const GOOGLE_PHOTO_URL_REGEX = /https:\/\/lh3\.googleusercontent\.com\/pw\/[A-Za-z0-9_-]{20,}/g;
 const GALLERY_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+export const MAX_PHOTO_DOWNLOAD_BYTES = 15 * 1024 * 1024; // 15 MB hard download cap
 
 interface TemplePhotoItem {
   id: string;
@@ -257,6 +258,199 @@ function getCoalescedLiveTempleAlbumPhotos(): Promise<{ title: string; photos: T
   return inFlightGalleryPromise;
 }
 
+export interface PhotoDownloadOptions {
+  url: string;
+  fileNamePrefix: string;
+  maxBytes?: number;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * Streams an upstream image directly to the HTTP response while enforcing:
+ * - Hard download byte cap even when upstream omits Content-Length
+ * - Immediate upstream abort when client disconnects
+ * - Distinct error status codes for timeout (504), oversized payload (413), and other upstream failures (502)
+ */
+export async function streamBoundedImageDownload(
+  _req: Request,
+  res: Response,
+  options: PhotoDownloadOptions
+): Promise<void> {
+  const maxBytes = options.maxBytes ?? MAX_PHOTO_DOWNLOAD_BYTES;
+  const timeoutMs = options.timeoutMs ?? 12000;
+  const fetchFn = options.fetchImpl ?? fetch;
+
+  const controller = new AbortController();
+  let timedOut = false;
+  let clientDisconnected = false;
+  let exceededLimit = false;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
+  const onClientClose = () => {
+    if (!res.writableEnded) {
+      clientDisconnected = true;
+      controller.abort(new Error('CLIENT_DISCONNECTED'));
+      if (reader) {
+        void reader.cancel().catch(() => {});
+      }
+    }
+  };
+
+  res.on('close', onClientClose);
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new Error('UPSTREAM_TIMEOUT'));
+    if (reader) {
+      void reader.cancel().catch(() => {});
+    }
+  }, timeoutMs);
+
+  try {
+    const upstream = await fetchFn(options.url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36',
+        Accept: 'image/*',
+      },
+    });
+
+    if (!upstream.ok) {
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Unable to fetch photo for download' });
+      }
+      return;
+    }
+
+    const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Unexpected response format' });
+      }
+      return;
+    }
+
+    const rawContentLength = upstream.headers.get('content-length');
+    const declaredLength = rawContentLength !== null ? Number(rawContentLength) : NaN;
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+      exceededLimit = true;
+      controller.abort(new Error('PAYLOAD_TOO_LARGE'));
+      if (upstream.body) {
+        void upstream.body.cancel().catch(() => {});
+      }
+      if (!res.headersSent) {
+        res.status(413).json({ error: 'Photo exceeds maximum allowed download size' });
+      }
+      return;
+    }
+
+    if (!upstream.body) {
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Empty upstream photo response' });
+      }
+      return;
+    }
+
+    const ext = contentType.includes('png')
+      ? 'png'
+      : contentType.includes('webp')
+      ? 'webp'
+      : 'jpg';
+
+    reader = upstream.body.getReader();
+    let totalBytes = 0;
+
+    while (true) {
+      if (clientDisconnected || timedOut) {
+        break;
+      }
+
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value || value.byteLength === 0) continue;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        exceededLimit = true;
+        controller.abort(new Error('PAYLOAD_TOO_LARGE'));
+        await reader.cancel().catch(() => {});
+        if (!res.headersSent) {
+          res.status(413).json({ error: 'Photo exceeds maximum allowed download size' });
+        } else {
+          res.destroy();
+        }
+        return;
+      }
+
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', contentType);
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${options.fileNamePrefix}.${ext}"`
+        );
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (Number.isFinite(declaredLength) && declaredLength >= 0 && declaredLength <= maxBytes) {
+          res.setHeader('Content-Length', String(declaredLength));
+        }
+      }
+
+      const chunkBuf = Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+      const canContinue = res.write(chunkBuf);
+      if (!canContinue && !clientDisconnected && !res.destroyed) {
+        await new Promise<void>((resolve) => {
+          const onDrain = () => {
+            res.off('close', onClose);
+            resolve();
+          };
+          const onClose = () => {
+            res.off('drain', onDrain);
+            resolve();
+          };
+          res.once('drain', onDrain);
+          res.once('close', onClose);
+        });
+      }
+    }
+
+    if (!clientDisconnected && !timedOut && !exceededLimit && !res.writableEnded) {
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Empty upstream photo response' });
+      } else {
+        res.end();
+      }
+    }
+  } catch {
+    if (clientDisconnected) {
+      return;
+    }
+    if (exceededLimit) {
+      if (!res.headersSent) {
+        res.status(413).json({ error: 'Photo exceeds maximum allowed download size' });
+      } else {
+        res.destroy();
+      }
+      return;
+    }
+    if (timedOut) {
+      if (!res.headersSent) {
+        res.status(504).json({ error: 'Photo download timed out' });
+      } else {
+        res.destroy();
+      }
+      return;
+    }
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'Upstream photo download failed' });
+    } else {
+      res.destroy();
+    }
+  } finally {
+    clearTimeout(timeout);
+    res.off('close', onClientClose);
+  }
+}
+
 async function startServer() {
   const app = express();
   app.disable('x-powered-by');
@@ -407,50 +601,12 @@ async function startServer() {
       return;
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-
-    try {
-      const upstream = await fetch(`${photo.baseUrl}=w1800`, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36',
-          Accept: 'image/*',
-        },
-      });
-
-      if (!upstream.ok) {
-        res.status(502).json({ error: 'Unable to fetch photo for download' });
-        return;
-      }
-
-      const contentType = upstream.headers.get('content-type') || 'image/jpeg';
-      if (!contentType.toLowerCase().startsWith('image/')) {
-        res.status(502).json({ error: 'Unexpected response format' });
-        return;
-      }
-
-      const ext = contentType.includes('png')
-        ? 'png'
-        : contentType.includes('webp')
-        ? 'webp'
-        : 'jpg';
-      const arrayBuf = await upstream.arrayBuffer();
-      const buffer = Buffer.from(arrayBuf);
-
-      res.setHeader('Content-Type', contentType);
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="swami-samarth-darbar-darshan-${rawIdx}.${ext}"`
-      );
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      res.setHeader('Content-Length', String(buffer.length));
-      res.send(buffer);
-    } catch {
-      res.status(504).json({ error: 'Download timed out' });
-    } finally {
-      clearTimeout(timeout);
-    }
+    await streamBoundedImageDownload(req, res, {
+      url: `${photo.baseUrl}=w1800`,
+      fileNamePrefix: `swami-samarth-darbar-darshan-${rawIdx}`,
+      maxBytes: MAX_PHOTO_DOWNLOAD_BYTES,
+      timeoutMs: 12000,
+    });
   });
 
   if (!IS_PROD) {
@@ -528,7 +684,13 @@ export class ErrorOverlay extends HTMLElement {}
   });
 }
 
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+const isDirectRun =
+  typeof process.argv[1] === 'string' &&
+  path.resolve(process.argv[1]) === path.resolve(__filename);
+
+if (isDirectRun) {
+  startServer().catch(err => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}
